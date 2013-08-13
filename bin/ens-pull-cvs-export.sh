@@ -22,7 +22,7 @@
 
 clean_up() {
   #cvs -d /srv/cvs/drupal up -C $GITSRV/$MODULE_BASE/$MODULE/ > /dev/null
-  rm $CVS_DIR/.msg $CVSDIR/.cvsexportcommit.diff
+  rm $CVS_DIR/.msg $CVS_DIR/.cvsexportcommit.diff
   find $CVS_DIR -name '.#*' -exec rm '{}' \;
   echo "** CVS commit failed. Cleaning up cvs directory... **"
   exit 2
@@ -47,29 +47,17 @@ readlink_cross() {
   RL_RESULT=$RL_PHYS_DIR/$RL_TARGET_FILE
 }
 
-COMMIT_ARG=''
-# COMMIT_ARG='-c'
+# COMMIT_ARG=''
+COMMIT_ARG='-c'
 
-if [ $# -lt 2 ]
-then
-  echo "Usage: $0 <git dir source> <CVS dir destination> <Git branch> <CVS branch>"
+if [ $# -ne 2 ]; then
+  echo "Usage: $0 <git dir source> <CVS dir destination>"
+  exit 1
 fi
 
 # git and CVS source directories
 GIT_DIR=$1
 CVS_DIR=$2
-
-#Get Git branch
-GIT_BRANCH=$3
-if [ -z "$GIT_BRANCH" ]; then
-  GIT_BRANCH='master'
-fi
-
-#Get CVS branch
-CVS_BRANCH=$4
-if [ -z "$CVS_BRANCH" ]; then
-  CVS_BRANCH='HEAD'
-fi
 
 # Canonicalisation of the paths cross platform style
 readlink_cross $GIT_DIR
@@ -96,25 +84,34 @@ fi
 
 # get new commit IDs
 LAST_EXPORTED=$(git config --local --get --null $LAST_EXPORT_CFG_VAR)
+NEW_COMMITS=''
 if [ -z "$LAST_EXPORTED" ]; then
   echo "** No $LAST_EXPORT_CFG_VAR found in local config. Have you ever pushed this before? Aborting"
   echo "** To populate run: git config --local --add $LAST_EXPORT_CFG_VAR VAR"
   exit 3
 else
-  refs_exists=$(git branch -r -q --contains $LAST_EXPORTED 2>&1)
+  #No need to check if the LAST_EXPORTED is currently the same as HEAD as HEAD..HEAD gives us nothing
+  NEW_COMMITS=$(git rev-list $LAST_EXPORTED..HEAD 2>/dev/null)
   if [[ $? != 0 ]]; then
-    echo "** The ref we were going to use $LAST_EXPORTED is not on this branch. Please set to something sensible"
+    echo "** The ref we were going to use $LAST_EXPORTED has resulted in no commit logs being found. Please check your current value"
     echo "** To remove run: git config --local --unset $LAST_EXPORT_CFG_VAR"
     echo "** To populate run: git config --local --add $LAST_EXPORT_CFG_VAR VAR"
     exit 4
   fi
-  NEW_COMMITS=$(git rev-list $LAST_EXPORTED..HEAD | awk '{print NR,$0}' | sort -nr | sed 's/^[0-9]* //')
 fi
 
+if [ -z "$NEW_COMMITS" ]; then
+  echo "** Finishing as there is nothing to export. We looked for git rev-list $LAST_EXPORTED..HEAD"
+  exit 0
+fi
+
+#Now filter & reverse
+NEW_COMMITS=$(echo $NEW_COMMITS | awk '{print NR,$0}' | sort -nr | sed 's/^[0-9]* //')
+
 for COMMIT in $NEW_COMMITS; do
-  echo '** Exporting $COMMIT commit to CVS: **'
-  git cvsexportcommit -a -p $COMMIT_ARG $CVS_DIR $COMMIT || clean_up
+  echo "** Exporting $COMMIT commit to CVS"
+  git cvsexportcommit -a -p $COMMIT_ARG -w $CVS_DIR $COMMIT || clean_up
   # save successful exported commit to local Git config
-  git config --local --unset $LAST_EXPORT_CFG_VAR
+  git config --local --unset-all $LAST_EXPORT_CFG_VAR
   git config --local --add $LAST_EXPORT_CFG_VAR $COMMIT
 done
