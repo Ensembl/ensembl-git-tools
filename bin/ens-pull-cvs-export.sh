@@ -65,8 +65,8 @@ readlink_cross() {
   RL_RESULT=$RL_PHYS_DIR/$RL_TARGET_FILE
 }
 
-COMMIT_ARG=''
-# COMMIT_ARG='-c'
+# COMMIT_ARG=''
+COMMIT_ARG='-c'
 
 if [ $# -ne 2 ]; then
   echo "Usage: $0 <git dir source> <CVS dir destination>"
@@ -118,7 +118,9 @@ else
   fi
   
   #No need to check if the LAST_EXPORTED is currently the same as HEAD as HEAD..HEAD gives us nothing
-  NEW_COMMITS=$(git rev-list $LAST_EXPORTED..HEAD 2>/dev/null | awk '{print NR,$0}' | sort -nr | sed 's/^[0-9]* //')
+  #We also use --first-parent. Makes us follow only the first parent commit upon seeing a merge commit
+  #Also reverse the commits
+  NEW_COMMITS=$(git rev-list --first-parent $LAST_EXPORTED..HEAD 2>/dev/null | awk '{print NR,$0}' | sort -nr | sed 's/^[0-9]* //')
 fi
 
 if [ -z "$NEW_COMMITS" ]; then
@@ -127,25 +129,20 @@ if [ -z "$NEW_COMMITS" ]; then
 fi
 
 for COMMIT in $NEW_COMMITS; do
-  #First check if the COMMIT was a child of our last exported ID
-  #we assume the first parent is always the branch we have merged into
-  #which will be *master*
-  first_parent=$(git rev-list --parents -n 1 $COMMIT | cut -f 2 -d ' ')
-  
-  #If they matched then we can do the merge
-  if [ $LAST_EXPORTED == $first_parent ]; then
-    echo "** Exporting $COMMIT commit to CVS. Using $LAST_EXPORTED as our root"
-    git cvsexportcommit -a -p $COMMIT_ARG -w $CVS_DIR $LAST_EXPORTED $COMMIT || clean_up
-    # save successful exported commit to local Git config
-    if [ -n "$COMMIT_ARG"]; then
-      git config --local --unset-all $LAST_EXPORT_CFG_VAR
-      git config --local --add $LAST_EXPORT_CFG_VAR $COMMIT
-      #Last exported commit is now this one
-      LAST_EXPORTED=$COMMIT
-    fi
+  echo "** Exporting $COMMIT commit to CVS. Using $LAST_EXPORTED as our root"
+  git cvsexportcommit -a -p $COMMIT_ARG -w $CVS_DIR $LAST_EXPORTED $COMMIT || clean_up
+  # save successful exported commit to local Git config
+  if [ -n "$COMMIT_ARG" ]; then
+    git config --local --unset-all $LAST_EXPORT_CFG_VAR
+    git config --local --add $LAST_EXPORT_CFG_VAR $COMMIT
+    #Last exported commit is now this one
+    LAST_EXPORTED=$COMMIT
   else
-    short_commit=$(git rev-parse --short $COMMIT)
-    short_first_parent=$(git rev-parse --short $first_parent)
-    echo "** Skipping $short_commit since its 1st parent was $short_first_parent"
+    #Quick hack. We just run the commits through & do not overwrite a thing.
+    #CVS & cvsexportcommit could get grumpy about this
+    if [ -f $CVS_DIR/.msg ]; then 
+      rm $CVS_DIR/.msg
+    fi
+    LAST_EXPORTED=$COMMIT
   fi
 done
