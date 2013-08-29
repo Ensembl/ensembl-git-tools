@@ -103,7 +103,11 @@ if [ -z "$target_branch" ]; then
   target_branch='dev'
 fi
 
-echo "* Target branch we are working with is '$target_branch'"
+if [ -z "$NO_PROMPT" ]; then
+  echo "* Target branch we are working with is '$target_branch'"
+  read -p "* Press return to continue (ctrl+c to abort)... " -s
+  echo
+fi
 
 # Exit if we do not have a dev branch
 git show-ref --verify --quiet refs/heads/$target_branch
@@ -134,22 +138,31 @@ current_rev=$(git rev-parse HEAD)
 rebase 'master'
 
 # Get the user to check the rebase
-echo "*  Please take a moment to review your changes."
-echo "*  Example cmd: git log --oneline --reverse master..dev"
-read -p "*  Press return to continue (ctrl+c to abort)... " -s
-result=$?
-echo
-if [[ $result -ne 0 ]]; then
-  echo "!! Process has been abandoned. Please review the changes" 1>&2
-  echo "!! You can reset the current changes using the following command (this will re-write your history and ref pointers)" 1>&2
-  echo "!! git reset $current_rev" 1>&2
-  exit 8
+if [ -z "$NO_PROMPT" ]; then
+  echo "*  Please take a moment to review your changes."
+  echo "*  Example cmd: git log --oneline --reverse master..dev"
+  read -p "*  Press return to continue (ctrl+c to abort)... " -s
+  result=$?
+  echo
+  if [[ $result -ne 0 ]]; then
+    echo "!! Process has been abandoned. Please review the changes" 1>&2
+    echo "!! You can reset the current changes using the following command (this will re-write your history and ref pointers)" 1>&2
+    echo "!! git reset $current_rev" 1>&2
+    exit 8
+  fi
 fi
 
 #Now switch back, merge and push
 checkout 'master'
 uptodate_check 'master'
 merge $target_branch
+
+if [ -z "$NO_PROMPT" ]; then
+  echo "* About to push to origin"
+  read -p "* Press return to continue (ctrl+c to abort)... " -s
+  echo
+fi
+
 push
 
 #Go back to target branch
