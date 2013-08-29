@@ -50,7 +50,7 @@ function pull() {
 function no_ff_merge() {
   branch=$1
   echo "*  Merge current branch with $branch"
-  git merge --no-ff -log -m "Automatic merging of $branch" $branch
+  git merge --no-ff --log -m "Automatic merging of $branch" $branch
   if [[ $? -ne 0 ]]; then
     echo "Git merge with $branch failed" 1>&2
     exit 6
