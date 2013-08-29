@@ -140,7 +140,7 @@ rebase 'master'
 # Get the user to check the rebase
 if [ -z "$NO_PROMPT" ]; then
   echo "*  Please take a moment to review your changes."
-  echo "*  Example cmd: git log --oneline --reverse master..dev"
+  echo "*  Example cmd: git log --oneline --reverse master..$target_branch"
   read -p "*  Press return to continue (ctrl+c to abort)... " -s
   result=$?
   echo
