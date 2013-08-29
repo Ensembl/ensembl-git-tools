@@ -117,7 +117,7 @@ require_clean_work_tree 'merge'
 # Switch to master. Ensure we are not behind origin/master and merge
 checkout 'master'
 uptodate_check 'master'
-merge $target_branch
+no_ff_merge $target_branch
 
 # Get the user to check the merge
 if [ -z "$NO_PROMPT" ]; then
