@@ -33,7 +33,7 @@ function rebase() {
 function merge() {
   branch=$1
   echo "*  Merge current branch with $branch"
-  git merge $branch
+  git merge --ff-only $branch
   if [[ $? -ne 0 ]]; then
     echo "Git merge with $branch failed" 1>&2
     exit 6
@@ -61,14 +61,6 @@ git show-ref --verify --quiet refs/heads/dev
 if [[ $? -ne 0 ]]; then
   echo "!! The branch dev does not exist. Cannot continue as there is nothing to merge" 1>&2
   exit 2
-fi
-
-# Exit if we are not using fast-forward merges on master
-merge_strategy=$(git config --get 'branch.master.mergeoptions')
-if [[ "$merge_strategy" != '--ff-only' ]]; then
-  echo "!! The master branch config 'branch.master.mergeoptions' is not set to '--ff-only'. Fix please before continuing" 1>&2
-  echo "!! git config --add branch.master.mergeoptions '--ff-only'" 1>&2
-  exit 3
 fi
 
 dev_merge=$(git config --get branch.dev.merge)
