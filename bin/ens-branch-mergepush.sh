@@ -1,10 +1,10 @@
 #!/bin/sh
 
 usage(){
-	echo "Usage: $0 [source_branch] [target_branch]"
-	echo "  * source_branch == defaults to dev. Cannot be a remote tracking branch"
-	echo "  * target_branch == defaults to master"
-	exit 1
+	echo "Usage: $0 -s [source_branch] -t [target_branch] -n[opush]"
+	echo "  * -s = source_branch. Defaults to dev. Cannot be a remote tracking branch"
+	echo "  * -t = target_branch. Defaults to master"
+	echo "  * -n = nopush. Stop any attempt at pushing to a master server"
 }
 
 # following functiontaken from 
@@ -114,22 +114,32 @@ if [[ $? -ne 0 ]]; then
   exit 1
 fi
 
-# Do a quick check for --help request
-if [ $# -gt 0 ]; then
-  if [ "$1" == '-help' ] || [ "$1" == '-h' ] || [ "$1" == '--help' ] || [ "$1" == '--h' ]; then
-    usage
-  fi
-fi
-
-source_branch=$1
-if [ -z "$source_branch" ]; then
-  source_branch='dev'
-fi
-
-target_branch=$2
-if [ -z "$target_branch" ]; then
-  target_branch='master'
-fi
+source_branch='dev'
+target_branch='master'
+while getopts ":s:t:nh" opt; do
+  case $opt in
+    s)
+      source_branch=$OPTARG
+      ;;
+    t)
+      target_branch=$OPTARG
+      ;;
+    h)
+      usage
+      exit 0
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      usage
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
 
 if [ -z "$NO_PROMPT" ]; then
   echo "* Source branch is '$source_branch'"
