@@ -126,7 +126,7 @@ if [ -z "$source_branch" ]; then
   source_branch='dev'
 fi
 
-target_branch=$1
+target_branch=$2
 if [ -z "$target_branch" ]; then
   target_branch='master'
 fi
