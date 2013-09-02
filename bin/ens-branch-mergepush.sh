@@ -1,5 +1,12 @@
 #!/bin/sh
 
+usage(){
+	echo "Usage: $0 [source_branch] [target_branch]"
+	echo "  * source_branch == defaults to dev. Cannot be a remote tracking branch"
+	echo "  * target_branch == defaults to master"
+	exit 1
+}
+
 # following functiontaken from 
 # http://stackoverflow.com/questions/3878624/how-do-i-programmatically-determine-if-there-are-uncommited-changes
 function require_clean_work_tree () {
@@ -24,6 +31,15 @@ function require_clean_work_tree () {
   if [ $err = 1 ]; then
     echo >&2 "!! Please commit/stash them and retry this command"
     exit 1
+  fi
+}
+
+function branch_exists() {
+  testing_branch=$1
+  git show-ref --verify --quiet refs/heads/$testing_branch
+  if [[ $? -ne 0 ]]; then
+    echo "!! The branch $testing_branch does not exist. Cannot continue as there is nothing to merge" 1>&2
+    exit 2
   fi
 }
 
@@ -98,49 +114,59 @@ if [[ $? -ne 0 ]]; then
   exit 1
 fi
 
+# Do a quick check for --help request
+if [ $# -gt 0 ]; then
+  if [ "$1" == '-help' ] || [ "$1" == '-h' ] || [ "$1" == '--help' ] || [ "$1" == '--h' ]; then
+    usage
+  fi
+fi
+
+source_branch=$1
+if [ -z "$source_branch" ]; then
+  source_branch='dev'
+fi
+
 target_branch=$1
 if [ -z "$target_branch" ]; then
-  target_branch='dev'
+  target_branch='master'
 fi
 
 if [ -z "$NO_PROMPT" ]; then
-  echo "* Target branch we are working with is '$target_branch'"
+  echo "* Source branch is '$source_branch'"
+  echo "* Target branch is '$target_branch'"
   read -p "* Press return to continue (ctrl+c to abort)... " -s
   echo
 fi
 
-# Exit if we do not have a dev branch
-git show-ref --verify --quiet refs/heads/$target_branch
-if [[ $? -ne 0 ]]; then
-  echo "!! The branch $target_branch does not exist. Cannot continue as there is nothing to merge" 1>&2
-  exit 2
-fi
+# Exit if we do not have a source/target branch
+branch_exists $source_branch
+branch_exists $target_branch
 
-branch_merge=$(git config --get branch.$target_branch.merge)
-branch_remote=$(git config --get branch.$target_branch.remote)
+branch_merge=$(git config --get branch.$source_branch.merge)
+branch_remote=$(git config --get branch.$source_branch.remote)
 if [ -n "$branch_merge" ]; then
-  echo "!! The $target_branch branch is setup to merge with '$branch_merge'. Do not do this. dev must be a local branch non-tracking branch" 1>&2
+  echo "!! The $source_branch branch is setup to merge with '$branch_merge'. Do not do this. dev must be a local branch non-tracking branch" 1>&2
   exit 3
 fi
 if [ -n "$branch_remote" ]; then
-  echo "!! The $target_branch branch is tracking a remote '$branch_remote'. Do not do this. dev must be a local branch non-tracking branch" 1>&2
+  echo "!! The $source_branch branch is tracking a remote '$branch_remote'. Do not do this. dev must be a local branch non-tracking branch" 1>&2
   exit 3
 fi
 
-# Do the master checkout & pull
-checkout 'master'
+# Do the target branch (most likely "master") checkout & pull
+checkout $target_branch
 pull 'origin'
 
 # Switch back to branch and rebase. Rebase can fail due to merge conflicts
-checkout $target_branch
+checkout $source_branch
 require_clean_work_tree 'rebase'
 current_rev=$(git rev-parse HEAD)
-rebase 'master'
+rebase $target_branch
 
 # Get the user to check the rebase
 if [ -z "$NO_PROMPT" ]; then
   echo "*  Please take a moment to review your changes."
-  echo "*  Example cmd: git log --oneline --reverse master..$target_branch"
+  echo "*  Example cmd: git log --oneline --reverse ${target_branch}..${source_branch}"
   read -p "*  Press return to continue (ctrl+c to abort)... " -s
   result=$?
   echo
@@ -153,9 +179,9 @@ if [ -z "$NO_PROMPT" ]; then
 fi
 
 #Now switch back, merge and push
-checkout 'master'
-uptodate_check 'master'
-merge $target_branch
+checkout $target_branch
+uptodate_check $target_branch
+merge $source_branch
 
 if [ -z "$NO_PROMPT" ]; then
   echo "* About to push to origin"
@@ -166,6 +192,6 @@ fi
 push
 
 #Go back to target branch
-checkout $target_branch
+checkout $source_branch
 
 echo "*  Finished merge and push"
