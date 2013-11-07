@@ -140,17 +140,13 @@ detect_cvs_branch() {
 }
 
 list_all_config() {
-  pushd $GIT_DIR > /dev/null
   git config --get-regexp $LAST_EXPORT_CFG_VAR
-  popd > /dev/null
 }
 
 unset_all_config() {
-  pushd $GIT_DIR > /dev/null
   for c in $(git config --get-regexp $LAST_EXPORT_CFG_VAR | cut -d ' ' -f 1); do
     git config --unset-all $c
   done
-  popd > /dev/null
 }
 
 function uptodate_check() {
@@ -169,6 +165,8 @@ function uptodate_check() {
 # git and CVS source directories
 GIT_DIR=''
 CVS_DIR=''
+list_configs=''
+unset_configs=''
 
 # Parse options
 while getopts ":g:c:luhC" opt; do
@@ -186,12 +184,10 @@ while getopts ":g:c:luhC" opt; do
       CVS_DIR=$RL_RESULT
       ;;
     l)
-      list_all_config
-      exit 0
+      list_configs='1'
       ;;
     u)
-      unset_all_config
-      exit 0
+      unset_configs='1'
       ;;
     C)
       COMMIT_ARG='-c'
@@ -214,7 +210,7 @@ while getopts ":g:c:luhC" opt; do
   esac
 done
 
-# Checking the configs are OK
+# Checking the Git configs are OK
 if [ -z "$GIT_DIR" ]; then
   echo "No GIT_DIR was given" >&2
   usage
@@ -225,6 +221,25 @@ if [ ! -d "$GIT_DIR" ]; then
   usage
   exit 1
 fi
+
+# Check the git dir is OK and the current work tree is clean
+git_ok
+
+# switch to git dir
+pushd $GIT_DIR > /dev/null
+
+# do any actions not requiring CVS
+if [ -n "$list_configs" ]; then
+  list_all_config
+  exit 0
+fi
+
+if [ -n "$unset_configs" ]; then
+  unset_all_config
+  exit 0
+fi
+
+# Finish checking for CVS
 if [ -z "$CVS_DIR" ]; then
   echo "No CVS_DIR was given" >&2
   usage
@@ -235,12 +250,6 @@ if [ ! -d "$CVS_DIR" ]; then
   usage
   exit 1
 fi
-
-# Check the git dir is OK and the current work tree is clean
-git_ok
-
-# switch to git dir
-pushd $GIT_DIR > /dev/null
 
 # Make sure we where called correctly.
 # CURRENT_GIT="$(git rev-parse --git-dir 2>/dev/null)" || exit 4 "** First argument must be a git repository **"
@@ -257,12 +266,14 @@ if [ -z "$NO_PROMPT" ]; then
   echo
 fi
 
+LAST_EXPORT_VAR="${LAST_EXPORT_CFG_VAR}.${CVS_BRANCH}"
+
 # do a fetch and check we are upto date
 git fetch origin
 uptodate_check $GIT_BRANCH
 
 # Get last exported
-LAST_EXPORTED=$(git config --local --get --null "${LAST_EXPORT_CFG_VAR}.${CVS_BRANCH}")
+LAST_EXPORTED=$(git config --local --get --null $LAST_EXPORT_VAR)
 if [ -z "$LAST_EXPORTED" ]; then
   echo "* No last exported config var found. Running scan"
   # diff CVS to Git. If HEAD Git isn't good then go back and try the last 5 commits
@@ -286,21 +297,21 @@ if [ -z "$LAST_EXPORTED" ]; then
 fi
 
 # get new commit IDs
-LAST_EXPORTED=$(git config --local --get --null "${LAST_EXPORT_CFG_VAR}.${CVS_BRANCH}")
+LAST_EXPORTED=$(git config --local --get --null $LAST_EXPORT_VAR)
 
 NEW_COMMITS=''
 if [ -z "$LAST_EXPORTED" ]; then
   echo "Cannot detect the last time $CVS_DIR and $GIT_DIR were identical" >&2
   echo "No $LAST_EXPORT_CFG_VAR found in local config. Have you ever pushed this before? Aborting" >&2
-  echo "To populate run: git config --local --add ${LAST_EXPORT_CFG_VAR}.${CVS_BRANCH} HASH" >&2
+  echo "To populate run: git config --local --add $LAST_EXPORT_VAR HASH" >&2
   exit 3
 else
   #First set the LAST_EXPORTED to the full hash. If we could not do this then the given ref is bogus
   LAST_EXPORTED=$(git rev-parse $LAST_EXPORTED)
   if [[ $? != 0 ]]; then
     echo "The ref we were going to use $LAST_EXPORTED is unknown to this repository. Please check your current value" >&2
-    echo "To remove run: git config --local --unset $LAST_EXPORT_CFG_VAR" >&2
-    echo "To populate run: git config --local --add $LAST_EXPORT_CFG_VAR VAR" >&2
+    echo "To remove run: git config --local --unset $LAST_EXPORT_VAR" >&2
+    echo "To populate run: git config --local --add $LAST_EXPORT_VAR VAR" >&2
     exit 4
   fi
   
@@ -320,15 +331,17 @@ for COMMIT in $NEW_COMMITS; do
   git cvsexportcommit -a -p $COMMIT_ARG -w $CVS_DIR $LAST_EXPORTED $COMMIT || clean_up
   # save successful exported commit to local Git config
   if [ -n "$COMMIT_ARG" ]; then
-    git config --local --unset-all $LAST_EXPORT_CFG_VAR
-    git config --local --add $LAST_EXPORT_CFG_VAR $COMMIT
+    git config --local --unset-all $LAST_EXPORT_VAR
+    git config --local --add $LAST_EXPORT_VAR $COMMIT
     #Last exported commit is now this one
     LAST_EXPORTED=$COMMIT
   else
     #Quick hack. We just run the commits through & do not overwrite a thing.
     #CVS & cvsexportcommit could get grumpy about this
     if [ -f $CVS_DIR/.msg ]; then 
-      rm $CVS_DIR/.msg
+      # If commit was off then we can only apply 1 commit
+      echo "** Commit is not on. Only applying 1 commit"
+      break
     fi
     LAST_EXPORTED=$COMMIT
   fi
