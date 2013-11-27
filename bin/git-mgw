@@ -71,7 +71,7 @@ sub run {
   }
 
   git_push('origin', 'verbose');
-  print "* Finished and pushed to origin\n";
+  print "* Finished and pushed changes to origin\n";
 
   exit 0;
 }
