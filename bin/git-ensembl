@@ -23,12 +23,8 @@ use EnsEMBL::Git;
 
 # This normally lives in ~ensembl/git-ensembl.groups or ~/git-ensembl.groups
 my $CFG_FILE = 'git-ensembl.groups';
-# Most repos have this public root
+# All default ensembl repos have this public root
 my $GITHUB_ROOT = 'https://github.com/Ensembl/';
-# Write capable root is
-my $GITHUB_WRITE = 'git@github.com:Ensembl/';
-
-our $GIT_DIR;
 
 run();
 
@@ -58,7 +54,6 @@ sub run {
 sub parse_command_line {
   my $opts = {
     dir => cwd(),
-    https => 0,
     verbose => 1,
     help => 0,
     man => 0
@@ -73,7 +68,7 @@ sub parse_command_line {
     dir=s
     groups
     list
-    https
+    user|username=s
     help|?
     man
   /) or pod2usage(2);
@@ -95,12 +90,21 @@ sub parse_command_line {
 
 sub run_clone {
   my ($opts, $group) = @_;
+
   _loop_modules($opts, $group, sub {
     my ($module, $remote) = @_;
+
     if ( -d $module) {
-      print STDERR "Skipping module as there is already a directory called that; try 'git ensembl --pull'\n";
+      print STDERR "! Skipping module as there is already a directory called that; try 'git ensembl --pull'\n";
       return;
     }
+
+    my $usr = $opts->{user};
+    if($remote =~ /^https/ && $usr) {
+      print "* Using the HTTPS protocol with username $usr\n";
+      $remote =~ s/github\.com/$usr\@github.com/;
+    }
+
     clone($remote, $opts->{verbose});
     return;
   });
@@ -253,26 +257,15 @@ sub _central_groups {
 # Provide the default groups
 sub _default_groups {
   my ($opts) = @_;
-  my $root = ($opts->{https}) ? $GITHUB_ROOT : $GITHUB_WRITE;
 
   my $core_api_modules = {
-    'ensembl'           => $root.'ensembl.git',
-    'ensembl-compara'   => $root.'ensembl-compara.git',
-    'ensembl-variation' => $root.'ensembl-variation.git',
-    'ensembl-funcgen'   => $root.'ensembl-funcgen.git',
+    'ensembl'           => $GITHUB_ROOT.'ensembl.git',
+    'ensembl-compara'   => $GITHUB_ROOT.'ensembl-compara.git',
+    'ensembl-variation' => $GITHUB_ROOT.'ensembl-variation.git',
+    'ensembl-funcgen'   => $GITHUB_ROOT.'ensembl-funcgen.git',
   };
 
   return {
-    
-    test => {
-      desc => 'This is a test. We will checkout ensembl and compara APIs',
-      modules => {
-        'ensembl' => $root.'ensembl.git',
-        'ensembl-compara'   => $root.'ensembl-compara.git',
-      }
-    },
-
-
     api => {
       desc => 'API module set used for querying and processing Ensembl data',
       modules => $core_api_modules,
@@ -281,31 +274,31 @@ sub _default_groups {
       desc => 'Libraries required to run Ensembl tools such as the VEP',
       modules => {
         %{$core_api_modules},
-        'ensembl-tools' => $root.'ensembl-tools.git'
+        'ensembl-tools' => $GITHUB_ROOT.'ensembl-tools.git'
       },
     },
     production => {
       desc => 'Libraries required to run Ensembl production',
       modules => {
         %{$core_api_modules},
-        'ensembl-production' => $root.'ensembl-production.git',
-        'ensembl-orm' => $root.'ensembl-orm.git',
+        'ensembl-production' => $GITHUB_ROOT.'ensembl-production.git',
+        'ensembl-orm' => $GITHUB_ROOT.'ensembl-orm.git',
       },
     },
     rest => {
       desc => 'Libraries required to run the Ensembl REST API',
       modules => {
         %{$core_api_modules},
-        'ensembl-rest' => $root.'ensembl-rest.git',
+        'ensembl-rest' => $GITHUB_ROOT.'ensembl-rest.git',
       },
     },
     webcode => {
       desc => 'Libraries required to run the Ensembl website',
       modules => {
         %{$core_api_modules},
-        'ensembl-webcode' => $root.'ensembl-webcode.git',
-        'ensembl-draw' => $root.'ensembl-draw.git',
-        'ensembl-orm' => $root.'ensembl-orm.git'
+        'ensembl-webcode' => $GITHUB_ROOT.'ensembl-webcode.git',
+        'ensembl-draw' => $GITHUB_ROOT.'ensembl-draw.git',
+        'ensembl-orm' => $GITHUB_ROOT.'ensembl-orm.git'
       },
     }
   };
@@ -322,7 +315,7 @@ git-ensembl - Ensembl-centric Git Utility
 
 =head1 SYNOPSIS
 
-git ensembl [--clone] [--checkout --branch BRANCH] [--pull] 
+git ensembl [--clone [--user USR] ] [--checkout --branch BRANCH] [--pull] 
             [--dir DIR] [--groups] [--list] [-v] [-h] [-m] GROUPS
 
 # List all available groups
@@ -331,11 +324,17 @@ git ensembl --list
 # Clone all the API modules
 git ensembl --clone api
 
-# Pull in new changes
+# Clone as a specific GitHub user
+git ensembl --clone --user myusr api 
+
+# Pull in new changes (merges into each repo's current branch)
 git ensembl --pull api
 
 # Pull in new changes on the given branch
 git ensembl --pull --branch master api
+
+# Switch to a branch in all repos or create a new remote tracking branch
+git ensembl --checkout --branch global/branch api
 
 =head1 DESCRIPTION
 
@@ -343,6 +342,14 @@ Provides a number of convienience actions used to clone, switch branches
 & pull in new changes from remote Ensembl repositories. It also provides 
 a way of addressing multiple repositories by a group name and applying 
 the previously mentioned functions over those groups.
+
+All repositories are cloned using HTTPS as since Git version 1.7.10 the 
+HTTPS protocol has been significantly changed to be as efficient as the
+SSH and Git protocols.
+
+B<If you are making a read/write clone make sure you specify your username via
+the --user command line argument. Otherwise Git will use your default 
+authentication details.>
 
 =head1 CONFIGURATION
 
