@@ -1,0 +1,433 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+BEGIN {
+  use File::Basename;
+  use File::Spec;
+  my $dirname = dirname(__FILE__);
+  my $lib = File::Spec->catdir($dirname, File::Spec->updir(), 'lib');
+  if(-d $lib) {
+    unshift(@INC, $lib);
+  }
+  else {
+    die "Cannot find the lib directory in the expected location $lib";
+  }
+};
+
+use Pod::Usage;
+use Getopt::Long;
+use Cwd;
+use EnsEMBL::Git;
+
+# This normally lives in ~ensembl/git-ensembl.groups or ~/git-ensembl.groups
+my $CFG_FILE = 'git-ensembl.groups';
+# Most repos have this public root
+my $GITHUB_ROOT = 'https://github.com/Ensembl/';
+# Write capable root is
+my $GITHUB_WRITE = 'git@github.com:Ensembl/';
+
+our $GIT_DIR;
+
+run();
+
+sub run {
+  my $opts = parse_command_line();
+  chdir $opts->{dir};
+  foreach my $grp (@{$opts->{groups}}) {
+    if($opts->{list}) {
+      run_list($opts);
+    }
+    elsif($opts->{clone}) {
+      run_clone($opts, $grp);
+    }
+    elsif($opts->{checkout}) {
+      run_checkout($opts, $grp);
+    }
+    elsif($opts->{pull}) {
+      run_pull($opts, $grp);
+    }
+    elsif($opts->{fetch}) {
+      run_fetch($opts, $grp);
+    }
+  }
+  exit 0;
+}
+
+sub parse_command_line {
+  my $opts = {
+    dir => cwd(),
+    https => 0,
+    verbose => 1,
+    help => 0,
+    man => 0
+  };
+
+  GetOptions($opts, qw/
+    clone
+    checkout
+    branch=s
+    pull
+    fetch
+    dir=s
+    groups
+    list
+    https
+    help|?
+    man
+  /) or pod2usage(2);
+
+  pod2usage(1) if $opts->{help};
+  pod2usage(-exitval => 0, -verbose => 2) if $opts->{man};
+
+  if($opts->{checkout} && ! $opts->{branch}) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => 'You must a --branch when using --checkout');
+  }
+
+  # parsing grabbed the -- args so we're left with just the final groups
+  if(! $opts->{list} && ! @ARGV) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => 'No groups specified; please specify some');
+  }
+  $opts->{groups} = [map { lc($_) } @ARGV];
+  return $opts;
+}
+
+sub run_clone {
+  my ($opts, $group) = @_;
+  _loop_modules($opts, $group, sub {
+    my ($module, $remote) = @_;
+    if ( -d $module) {
+      print STDERR "Skipping module as there is already a directory called that; try 'git ensembl --pull'\n";
+      return;
+    }
+    clone($remote, $opts->{verbose});
+    return;
+  });
+  return;
+}
+
+sub run_checkout {
+  my ($opts, $group) = @_;
+  my $branch = $opts->{branch};
+  my $verbose = $opts->{verbose};
+  _loop_modules_and_chdir($opts, $group, sub {
+    print "* Checking out branch '${branch}'\n";
+    if(! checkout_tracking($branch, 'origin', $verbose)) {
+      printf STDERR "! Cannot switch to ${branch}\n";
+      return 0;
+    }
+    return;
+  });
+  return;
+}
+
+sub run_pull {
+  my ($opts, $group) = @_;
+  my $branch = $opts->{branch};
+  my $verbose = $opts->{verbose};
+  _loop_modules_and_chdir($opts, $group, sub {
+    my ($module) = @_;
+    if($branch) {
+      print "* Switching branches before initating pull from origin\n";
+      if(! checkout_tracking($branch, 'origin', $verbose)) {
+        printf STDERR "! Cannot switch to ${branch}\n";
+        return 0;
+      }
+    }
+
+    print "* Performing pull\n";
+    pull($verbose);
+
+    return;
+  });
+  return;
+}
+
+sub run_fetch {
+  my ($opts, $group) = @_;
+  _loop_modules_and_chdir($opts, $group, sub {
+    my ($module) = @_;
+    print "* Performing fetch\n";
+    fetch($opts->{verbose});
+    return;
+  });
+  return;
+}
+
+sub run_list {
+  my ($opts) = @_;
+  my $all_groups = get_groups($opts);
+  foreach my $group (sort keys %$all_groups) {
+    my $definitions = $all_groups->{$group};
+    printf("[%s] - %s\n", $group, $definitions->{desc});
+    printf("\t%s (%s)\n", $_, $definitions->{modules}->{$_}) for sort keys %{$definitions->{modules}};
+    print "\n";
+  }
+  return;
+}
+
+sub _loop_modules_and_chdir {
+  my ($opts, $group, $callback) = @_;
+  _loop_modules($opts, $group, sub {
+    my ($module, $remote) = @_;
+    if (! -d $module) {
+      print STDERR "Skipping module as there is no directory called that; try 'git ensembl --clone'\n";
+      return;
+    }
+    chdir($module);
+    $callback->($module, $remote);
+    chdir(File::Spec->updir());
+    return;
+  });
+}
+
+# Takes a group name and a callback. We grab the modules and for each one we ask 
+# the callback to process the name and it's remote URL
+sub _loop_modules {
+  my ($opts, $group, $callback) = @_;
+  printf "* Processing group '%s'\n\n", $group;
+  my $modules = get_modules($opts, $group);
+  if(! keys %{$modules}) {
+    print "* Cannot find any modules. Check that this group was active using --list\n";
+    return;
+  }
+
+  foreach my $module (sort keys %{$modules}) {
+    printf "* Working with '%s'\n", $module;
+    my $remote = $modules->{$module};
+    $callback->($module, $remote);
+    print "\n";
+  }
+  return;
+}
+
+# Loop through the remainder
+sub verify_groups {
+  my ($opts) = @_;
+  my $groups = get_groups($opts);
+  foreach my $group (@{$opts->{groups}}) {
+    if(! exists $groups->{$group}) {
+      pod2usage(-exitval => 1, -verbose => 1, -msg => "We do not understand the group '${group}'. Please use the --list command to see all available groups");
+    }
+  }
+  return 1;
+}
+
+sub get_modules {
+  my ($opts, $group) = @_;
+  my $all_groups = get_groups($opts);
+  return $all_groups->{$group}->{modules};
+}
+
+sub get_groups {
+  my ($opts) = @_;
+  my $default = _default_groups($opts);
+  my $central = _central_groups($opts);
+  my $user    = _user_groups($opts);
+  return {
+    %{$default},
+    %{$central},
+    %{$user},
+  };
+}
+
+# Grab the user groups from $HOME/$CFG_FILE
+sub _user_groups {
+  my ($opts) = @_;
+  my $my_home = (getpwuid($<))[7];
+  my $file = File::Spec->catfile($my_home, $CFG_FILE);
+  return {} unless -f $file;
+  return json($file);
+}
+
+# Grab the central groups from $ENSHOME/$CFG_FILE
+sub _central_groups {
+  my ($opts) = @_;
+  my $ens_home = (getpwnam('ensembl'))[7];
+  my $file = File::Spec->catfile($ens_home, $CFG_FILE);
+  return {} unless -f $file;
+  return json($file);
+}
+
+# Provide the default groups
+sub _default_groups {
+  my ($opts) = @_;
+  my $root = ($opts->{https}) ? $GITHUB_ROOT : $GITHUB_WRITE;
+
+  my $core_api_modules = {
+    'ensembl'           => $root.'ensembl.git',
+    'ensembl-compara'   => $root.'ensembl-compara.git',
+    'ensembl-variation' => $root.'ensembl-variation.git',
+    'ensembl-funcgen'   => $root.'ensembl-funcgen.git',
+  };
+
+  return {
+    
+    test => {
+      desc => 'This is a test. We will checkout ensembl and compara APIs',
+      modules => {
+        'ensembl' => $root.'ensembl.git',
+        'ensembl-compara'   => $root.'ensembl-compara.git',
+      }
+    },
+
+
+    api => {
+      desc => 'API module set used for querying and processing Ensembl data',
+      modules => $core_api_modules,
+    },
+    tools => {
+      desc => 'Libraries required to run Ensembl tools such as the VEP',
+      modules => {
+        %{$core_api_modules},
+        'ensembl-tools' => $root.'ensembl-tools.git'
+      },
+    },
+    production => {
+      desc => 'Libraries required to run Ensembl production',
+      modules => {
+        %{$core_api_modules},
+        'ensembl-production' => $root.'ensembl-production.git',
+        'ensembl-orm' => $root.'ensembl-orm.git',
+      },
+    },
+    rest => {
+      desc => 'Libraries required to run the Ensembl REST API',
+      modules => {
+        %{$core_api_modules},
+        'ensembl-rest' => $root.'ensembl-rest.git',
+      },
+    },
+    webcode => {
+      desc => 'Libraries required to run the Ensembl website',
+      modules => {
+        %{$core_api_modules},
+        'ensembl-webcode' => $root.'ensembl-webcode.git',
+        'ensembl-draw' => $root.'ensembl-draw.git',
+        'ensembl-orm' => $root.'ensembl-orm.git'
+      },
+    }
+  };
+}
+
+
+
+__END__
+=pod
+
+=head1 NAME
+
+git-ensembl - Ensembl-centric Git Utility
+
+=head1 SYNOPSIS
+
+git ensembl [--clone] [--checkout --branch BRANCH] [--pull] 
+            [--dir DIR] [--groups] [--list] [-v] [-h] [-m] GROUPS
+
+# List all available groups
+git ensembl --list
+
+# Clone all the API modules
+git ensembl --clone api
+
+# Pull in new changes
+git ensembl --pull api
+
+# Pull in new changes on the given branch
+git ensembl --pull --branch master api
+
+=head1 DESCRIPTION
+
+Provides a number of convienience actions used to clone, switch branches 
+& pull in new changes from remote Ensembl repositories. It also provides 
+a way of addressing multiple repositories by a group name and applying 
+the previously mentioned functions over those groups.
+
+=head1 CONFIGURATION
+
+This script ships with a number of default configurations. You can add 
+to these if they are in the default global location 
+C<~ensembl/git-ensembl.groups> or your home directory at 
+C<~/git-ensembl.groups>. The format is a permissive JSON file (
+accepting comments and tollerant to formatting/trailing 
+punctuation) like so:
+
+    {
+      "groupname" : {
+        "desc" : "Group description",
+        "modules" : {
+          "module" : "giturl",
+        }
+      }
+    }
+
+For example:
+
+    {
+      "coretests" : {
+        "desc" : "All the modules you need to get core modules working",
+        "modules" : {
+          "ensembl" : "https://github.com/Ensembl/ensembl.git",
+          "ensembl-test" : "https://github.com/Ensembl/ensembl-test.git",
+        }
+      }
+    }
+
+Configuration is resolved in the following order
+
+=over 8
+
+=item User configuration
+
+=item Central configuration
+
+=item Default configuration
+
+=back
+
+When a clashing group is named the higher priority group takes precedence.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<GROUPS>
+
+The groups to perform actions on. Use B<--list> to find all available groups
+
+=item B<--clone>
+
+Clone the repositories linked to the given group (Ensembl's remote hosted on GitHub)
+
+=item B<--checkout>
+
+Checkout the branch specified in the B<--branch> command
+
+=item B<--branch>
+
+Branch to switch to. Used in conjunction with the B<--checkout> and B<--pull> commands
+
+=item B<--pull>
+
+Perform a pull from origin (Ensembl's remote hosted on GitHub)
+
+=item B<--dir>
+
+Perform all commands in the given directory
+
+=item B<--list>
+
+List all available groups
+
+=item B<--help>
+
+Print the help information
+
+=item B<--man>
+
+Print a man page
+
+=back
+
+=cut
