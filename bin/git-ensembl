@@ -30,12 +30,14 @@ run();
 
 sub run {
   my $opts = parse_command_line();
+  if($opts->{list}) {
+    run_list($opts);
+    exit 0;
+  }
+
   chdir $opts->{dir};
   foreach my $grp (@{$opts->{groups}}) {
-    if($opts->{list}) {
-      run_list($opts);
-    }
-    elsif($opts->{clone}) {
+    if($opts->{clone}) {
       run_clone($opts, $grp);
     }
     elsif($opts->{checkout}) {
@@ -266,6 +268,13 @@ sub _default_groups {
   };
 
   return {
+    temp => {
+      desc => 'Temporary group reflecting currently available github based repos',
+      modules => {
+        'ensembl'           => $GITHUB_ROOT.'ensembl.git',
+        'ensembl-compara'   => $GITHUB_ROOT.'ensembl-compara.git',
+      }
+    },
     api => {
       desc => 'API module set used for querying and processing Ensembl data',
       modules => $core_api_modules,
