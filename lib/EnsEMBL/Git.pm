@@ -143,8 +143,8 @@ sub rev_parse {
 sub is_origin_uptodate {
   my ($branch) = @_;
   fetch();
-  my $local_hash  = _rev_parse($branch);
-  my $remote_hash = _rev_parse("origin/$branch");
+  my $local_hash  = rev_parse($branch);
+  my $remote_hash = rev_parse("origin/$branch");
   return ($local_hash eq $remote_hash) ? 1 : 0;
 }
 
