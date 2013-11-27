@@ -1,0 +1,141 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+BEGIN {
+  use File::Basename;
+  use File::Spec;
+  my $dirname = dirname(__FILE__);
+  my $lib = File::Spec->catdir($dirname, File::Spec->updir(), 'lib');
+  if(-d $lib) {
+    unshift(@INC, $lib);
+  }
+  else {
+    die "Cannot find the lib directory in the expected location $lib";
+  }
+};
+
+use Pod::Usage;
+use Getopt::Long;
+use EnsEMBL::Git;
+
+run();
+
+sub run {
+  my $opts = parse_command_line();
+
+  sanity_checks($opts);
+
+  my $src = $opts->{source};
+  my $trg = $opts->{target};
+
+  # Checkout target and get latest changes
+  checkout($trg);
+  if(! pull('origin', 'verbose')) {
+    print STDERR "! Could not perform pull from origin. Aborting\n";
+    exit 3;
+  }
+
+  # Back to src
+  checkout($src);
+  if(! is_tree_clean()) {
+    print STDERR "! Cannot continue; tree is not clean and rebases can fail\n";
+    exit 4;
+  }
+  my $current_sha1 = rev_parse('HEAD');
+  rebase($trg);
+
+  print "* Please take a moment to review your changes.\n";
+  print "* Example cmd: git log --oneline --reverse ${trg}..${src}\n";
+  if(! prompt()) {
+    print STDERR "! Process has been abandoned. Please review the changes\n";
+    print STDERR  "! You can reset the current changes using the following command (this will re-write your history and ref pointers)\n";
+    print STDERR  "! git reset $current_sha1\n";
+    exit 5;
+  }
+
+  checkout($trg);
+  print "* Checking that $trg is at the same revision as origin/$trg\n";
+  if(!is_origin_uptodate($trg)) {
+    print STDERR "! Local and remote branches are not on the same hash. Cannot continue\n";
+    exit 6;
+  }
+
+  print "* About to push to origin\n";
+  if(! prompt()) {
+    print STDERR "! Abandoned changes\n";
+    exit 7;
+  }
+
+  git_push('origin', 'verbose');
+  print "* Finished and pushed to origin\n";
+
+  exit 0;
+}
+
+sub parse_command_line {
+  my $opts = {
+    source => 'dev',
+    target => 'master',
+    nopush => 0,
+    help => 0,
+    man => 0
+  };
+
+  GetOptions($opts, qw/
+    source=s
+    target=s
+    nopush
+    help|?
+    man
+  /) or pod2usage(2);
+
+  pod2usage(1) if $opts->{help};
+  pod2usage(-exitval => 0, -verbose => 2) if $opts->{man};
+
+  return $opts;
+}
+
+# Do ALOT of checks before we can proceed. 
+# 1) Make sure thisis a Git repo
+# 2) Check the branches exist
+# 3) Make sure src does not track a repo (otherwise rebase is bad)
+# 4) Confirm with the user
+sub sanity_checks {
+  my ($opts) = @_;
+  my $src = $opts->{source};
+  my $trg = $opts->{target};
+
+  if(! is_git_repo()) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => 'Current directory is not a Git repository');
+  }
+  if(! branch_exists($src)) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => "The branch $src does not exist. Rerun with --source"); 
+  }
+  if(! branch_exists($trg)) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => "The branch $trg does not exist. Rerun with --target"); 
+  }
+
+  my $src_merge = get_config("branch.${src}.merge");
+  my $src_remote = get_config("branch.${src}.remote");
+
+  if($src_merge) {
+    pod2usage(-exitval => 1, -verbose => 1, 
+      -msg => "The $src branch is setup to merge with '$src_merge'. Do not do this. This branch must be a local branch non-tracking branch"); 
+  }
+  if($src_remote) {
+    pod2usage(-exitval => 1, -verbose => 1, 
+      -msg => "The $src branch is tracking a remote '$src_remote'. Do not do this. This branch must be a local branch non-tracking branch"); 
+  }
+
+  print "* Source branch is '$src'\n";
+  print "* Target branch is '$trg'\n";
+  if(! prompt()) {
+    print STDERR "! Aborting on user request\n";
+    exit 2;
+  }
+
+  return;
+}
+

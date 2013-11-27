@@ -13,8 +13,14 @@ BEGIN {
 our @EXPORT = qw/
   json
   is_git_repo is_tree_clean is_origin_uptodate
+<<<<<<< HEAD
   clone checkout checkout_tracking pull fetch
   rev_parse branch_exists
+=======
+  clone checkout checkout_tracking pull fetch rebase ff_merge git_push
+  rev_parse branch_exists
+  get_config prompt
+>>>>>>> dev
 /;
 
 # Take a path, slurp and convert to a Perl data structure
@@ -88,16 +94,44 @@ sub branch_exists {
 
 # Runs a pull on whatever is the current branch (which means fetch & merge)
 sub pull {
-  my ($opts, $verbose) = @_;
+  my ($remote, $verbose) = @_;
+  $remote ||= 'origin';
   my $v = $verbose ? '--verbose' : q{};
-  return system_ok("git $v pull");
+  return system_ok("git pull $v $remote");
+}
+
+# Push to the specified remote
+sub git_push {
+  my ($remote, $verbose) = @_;
+  $remote ||= 'origin';
+  my $v = $verbose ? '--verbose' : q{};
+  return system_ok("git push $v $remote");
 }
 
 # Runs a fetch on origin but unlike pull will not do the merge
 sub fetch {
   my ($verbose) = @_;
   my $v = $verbose ? '--verbose' : q{};
-  return system_ok("git fetch $v origin"); 
+  return system_ok("git fetch $v origin");
+}
+
+# Rebases against the given branch
+sub rebase {
+  my ($branch) = @_;
+  return system_ok("git rebase $branch");
+}
+
+sub ff_merge {
+  my ($branch) = @_;
+  return system_ok("git merge --ff-only $branch");
+}
+
+# Get a config value out
+sub get_config {
+  my ($config) = @_;
+  my ($output) = cmd("git config --get $config");
+  chomp $output;
+  return $output;
 }
 
 # Convert a ref symbol into a SHA-1 hash
@@ -180,6 +214,18 @@ sub cmd_ok {
   my ($cmd) = @_;
   my ($output, $exitcode) = cmd($cmd);
   return $exitcode == 0 ? 1 : 0;
+}
+
+# Prompt the user for confirmation
+sub prompt {
+  my ($msg) = @_;
+  print '* OK to continue? (y/N)... ';
+  my $in = <STDIN>;
+  chomp $in;
+  if($in =~ /y(es)?/i) {
+    return 1;
+  }
+  return 0;
 }
 
 1;

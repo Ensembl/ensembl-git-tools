@@ -137,7 +137,7 @@ sub run_pull {
     }
 
     print "* Performing pull\n";
-    pull($verbose);
+    pull('origin', $verbose);
 
     return;
   });
