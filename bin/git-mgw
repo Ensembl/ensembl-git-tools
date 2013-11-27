@@ -55,12 +55,14 @@ sub run {
     exit 5;
   }
 
+  # Now back to master and merge
   checkout($trg);
   print "* Checking that $trg is at the same revision as origin/$trg\n";
   if(!is_origin_uptodate($trg)) {
     print STDERR "! Local and remote branches are not on the same hash. Cannot continue\n";
     exit 6;
   }
+  ff_merge($src);
 
   print "* About to push to origin\n";
   if(! prompt()) {
