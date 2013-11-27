@@ -48,7 +48,7 @@ sub run {
 
   print "* Please take a moment to review your changes.\n";
   print "* Example cmd: git log --oneline --reverse ${trg}..${src}\n";
-  if(! prompt()) {
+  if(! $opts->{noprompt} && ! prompt()) {
     print STDERR "! Process has been abandoned. Please review the changes\n";
     print STDERR  "! You can reset the current changes using the following command (this will re-write your history and ref pointers)\n";
     print STDERR  "! git reset $current_sha1\n";
@@ -69,7 +69,7 @@ sub run {
   }
   else {
     print "* About to push to origin\n";
-    if(! prompt()) {
+    if(! $opts->{noprompt} && ! prompt()) {
       print STDERR "! Abandoned changes\n";
       exit 7;
     }
@@ -91,6 +91,7 @@ sub parse_command_line {
     source => 'dev',
     target => 'master',
     nopush => 0,
+    noprompt => 0,
     help => 0,
     man => 0
   };
@@ -98,7 +99,8 @@ sub parse_command_line {
   GetOptions($opts, qw/
     source=s
     target=s
-    nopush
+    nopush!
+    noprompt!
     help|?
     man
   /) or pod2usage(2);
@@ -143,7 +145,7 @@ sub sanity_checks {
 
   print "* Source branch is '$src'\n";
   print "* Target branch is '$trg'\n";
-  if(! prompt()) {
+  if(! $opts->{noprompt} && ! prompt()) {
     print STDERR "! Aborting on user request\n";
     exit 2;
   }
@@ -160,7 +162,7 @@ git-mgw - Perform the Minimal Git Workflow
 
 =head1 SYNOPSIS
 
-git mgw [-source BRANCH] [-target BRANCH] [-nopush] [-h] [-m]
+git mgw [-source BRANCH] [-target BRANCH] [-nopush] [-noprompt] [-h] [-m]
 
 =head1 DESCRIPTION
 
@@ -184,6 +186,10 @@ The target branch of the changes. Defaults to master.
 =item B<--nopush>
 
 Do not push changes.
+
+=item B<--noprompt>
+
+Skip any user checks during this entire procedure
 
 =item B<--help>
 
