@@ -13,14 +13,9 @@ BEGIN {
 our @EXPORT = qw/
   json
   is_git_repo is_tree_clean is_origin_uptodate
-<<<<<<< HEAD
-  clone checkout checkout_tracking pull fetch
-  rev_parse branch_exists
-=======
   clone checkout checkout_tracking pull fetch rebase ff_merge git_push
   rev_parse branch_exists
   get_config prompt
->>>>>>> dev
 /;
 
 # Take a path, slurp and convert to a Perl data structure
