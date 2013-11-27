@@ -64,14 +64,19 @@ sub run {
   }
   ff_merge($src);
 
-  print "* About to push to origin\n";
-  if(! prompt()) {
-    print STDERR "! Abandoned changes\n";
-    exit 7;
+  if($opts->{nopush}) {
+    print "* Leaving changes on $trg and not pushing\n";
   }
+  else {
+    print "* About to push to origin\n";
+    if(! prompt()) {
+      print STDERR "! Abandoned changes\n";
+      exit 7;
+    }
 
-  git_push('origin', 'verbose');
-  print "* Finished and pushed changes to origin\n";
+    git_push('origin', 'verbose');
+    print "* Finished and pushed changes to origin\n";
+  }
 
   print "* Switching back to $src\n";
   checkout($src);
@@ -146,3 +151,48 @@ sub sanity_checks {
   return;
 }
 
+__END__
+=pod
+
+=head1 NAME
+
+git-mgw - Perform the Minimal Git Workflow
+
+=head1 SYNOPSIS
+
+git mgw [-source BRANCH] [-target BRANCH] [-nopush] [-h] [-m]
+
+=head1 DESCRIPTION
+
+Provides the Git minimal workflow which is an Anacode flow. It involves
+developing code on to a non-tracking branch (dev), rebasing
+against a tracking target (master), merging target with source and then 
+pushing the resulting fast forward merge to origin.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--source>
+
+The source branch of changes. Defaults to dev. Cannot be a remote tracking branch
+
+=item B<--target>
+
+The target branch of the changes. Defaults to master.
+
+=item B<--nopush>
+
+Do not push changes.
+
+=item B<--help>
+
+Print the help information
+
+=item B<--man>
+
+Print a man page
+
+=back
+
+=cut
