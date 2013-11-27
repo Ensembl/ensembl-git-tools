@@ -73,6 +73,11 @@ sub run {
   git_push('origin', 'verbose');
   print "* Finished and pushed changes to origin\n";
 
+  print "* Switching back to $src\n";
+  checkout($src);
+
+  print "* DONE\n";
+
   exit 0;
 }
 
