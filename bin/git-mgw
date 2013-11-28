@@ -80,7 +80,7 @@ sub run {
       exit 8;
     }
     print "* Please take a moment to review your changes\n";
-    print "* Example cmd: git log --oneline --reverse ${trg}..${src}\n";
+    print "* Example cmd: git log --oneline --reverse ${trg}...${trg}^\n";
     if(! $opts->{noprompt} && ! prompt()) {
       print STDERR "! Abandoned work\n";
       exit 8;
