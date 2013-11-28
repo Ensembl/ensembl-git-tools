@@ -24,7 +24,8 @@ use EnsEMBL::Git;
 # This normally lives in ~ensembl/git-ensembl.groups or ~/git-ensembl.groups
 my $CFG_FILE = 'git-ensembl.groups';
 # All default ensembl repos have this public root
-my $GITHUB_ROOT = 'https://github.com/Ensembl/';
+my $GITHUB_HTTPS_ROOT = 'https://github.com/Ensembl/';
+my $GITHUB_SSH_ROOT = 'ssh://git@github.com/Ensembl/';
 
 run();
 
@@ -70,7 +71,11 @@ sub parse_command_line {
     dir=s
     groups
     list
+    ssh
+    server=s
     user|username=s
+    github_user|github_username=s
+    github_email=s
     help|?
     man
   /) or pod2usage(2);
@@ -106,10 +111,30 @@ sub run_clone {
       print "* Using the HTTPS protocol with username $usr\n";
       $remote =~ s/github\.com/$usr\@github.com/;
     }
+    my $ssh_srv = $opts->{server};
+    if($remote =~ /^ssh/ && $ssh_srv) {
+      print "* Using the SSH protocol with server $ssh_srv\n";
+      $remote =~ s/github\.com/$ssh_srv/;
+    }
 
-    clone($remote, $opts->{verbose});
+    print "* Cloning from remote '${remote}'\n";
+    if(! clone($remote, $opts->{verbose})) {
+      print STDERR "! Failed to clone the module '$module'\n";
+      return;
+    }
+
+    # Now deal with config variables
+    if($opts->{github_user} || $opts->{github_email}) {
+      chdir($module);
+      print "* Setting user/email config variables\n";
+      add_config('user.name', $opts->{github_user}) if $opts->{github_user};
+      add_config('user.email', $opts->{github_email}) if $opts->{github_email};
+      chdir(File::Spec->updir());
+    }
+
     return;
   });
+
   return;
 }
 
@@ -260,19 +285,21 @@ sub _central_groups {
 sub _default_groups {
   my ($opts) = @_;
 
+  my $root = ($opts->{ssh}) ? $GITHUB_SSH_ROOT : $GITHUB_HTTPS_ROOT;
+
   my $core_api_modules = {
-    'ensembl'           => $GITHUB_ROOT.'ensembl.git',
-    'ensembl-compara'   => $GITHUB_ROOT.'ensembl-compara.git',
-    'ensembl-variation' => $GITHUB_ROOT.'ensembl-variation.git',
-    'ensembl-funcgen'   => $GITHUB_ROOT.'ensembl-funcgen.git',
+    'ensembl'           => $root.'ensembl.git',
+    'ensembl-compara'   => $root.'ensembl-compara.git',
+    'ensembl-variation' => $root.'ensembl-variation.git',
+    'ensembl-funcgen'   => $root.'ensembl-funcgen.git',
   };
 
   return {
     temp => {
       desc => 'Temporary group reflecting currently available github based repos',
       modules => {
-        'ensembl'           => $GITHUB_ROOT.'ensembl.git',
-        'ensembl-compara'   => $GITHUB_ROOT.'ensembl-compara.git',
+        'ensembl'           => $root.'ensembl.git',
+        'ensembl-compara'   => $root.'ensembl-compara.git',
       }
     },
     api => {
@@ -283,31 +310,32 @@ sub _default_groups {
       desc => 'Libraries required to run Ensembl tools such as the VEP',
       modules => {
         %{$core_api_modules},
-        'ensembl-tools' => $GITHUB_ROOT.'ensembl-tools.git'
+        'ensembl-tools' => $root.'ensembl-tools.git'
       },
     },
     production => {
       desc => 'Libraries required to run Ensembl production',
       modules => {
         %{$core_api_modules},
-        'ensembl-production' => $GITHUB_ROOT.'ensembl-production.git',
-        'ensembl-orm' => $GITHUB_ROOT.'ensembl-orm.git',
+        'ensembl-production' => $root.'ensembl-production.git',
+        'ensembl-orm' => $root.'ensembl-orm.git',
       },
     },
     rest => {
       desc => 'Libraries required to run the Ensembl REST API',
       modules => {
         %{$core_api_modules},
-        'ensembl-rest' => $GITHUB_ROOT.'ensembl-rest.git',
+        'ensembl-rest' => $root.'ensembl-rest.git',
       },
     },
-    webcode => {
+    web => {
       desc => 'Libraries required to run the Ensembl website',
       modules => {
         %{$core_api_modules},
-        'ensembl-webcode' => $GITHUB_ROOT.'ensembl-webcode.git',
-        'ensembl-draw' => $GITHUB_ROOT.'ensembl-draw.git',
-        'ensembl-orm' => $GITHUB_ROOT.'ensembl-orm.git'
+        'ensembl-webcode' => $root.'ensembl-webcode.git',
+        'ensembl-draw' => $root.'ensembl-draw.git',
+        'ensembl-orm' => $root.'ensembl-orm.git',
+        'public-plugins' => $root.'public-plugins.git',
       },
     }
   };
@@ -324,50 +352,54 @@ git-ensembl - Ensembl-centric Git Utility
 
 =head1 SYNOPSIS
 
-git ensembl [--clone [--user USR] ] [--checkout --branch BRANCH] [--pull] 
-            [--dir DIR] [--groups] [--list] [-v] [-h] [-m] GROUPS
+git ensembl [--clone [--user USR] ] [--checkout --branch BRANCH] 
+            [--pull] [--fetch] [--dir DIR] [--groups] [--list] 
+            [-v] [-h] [-m] GROUPS
 
 # List all available groups
+
 git ensembl --list
 
 # Clone all the API modules
+
 git ensembl --clone api
 
 # Clone as a specific GitHub user
-git ensembl --clone --user myusr api 
+
+git ensembl --clone --user myusr api
+
+# Clone, use a new user and set a new Git username and email
+
+git ensembl --clone --user myusr --github_user 'Name' 
+  --github_email 'email@somewhere.com' api
+
+# Clone using SSH and specify an alternative server name (see later for info about how to configure multiple GitHub accounts over SSH)
+
+git ensembl --clone --ssh --server ensembl.github.com
 
 # Pull in new changes (merges into each repo's current branch)
+
 git ensembl --pull api
 
 # Pull in new changes on the given branch
+
 git ensembl --pull --branch master api
 
 # Switch to a branch in all repos or create a new remote tracking branch
+
 git ensembl --checkout --branch global/branch api
 
 =head1 DESCRIPTION
 
-Provides a number of convienience actions used to clone, switch branches 
-& pull in new changes from remote Ensembl repositories. It also provides 
-a way of addressing multiple repositories by a group name and applying 
-the previously mentioned functions over those groups.
+Provides a number of convienience actions used to clone, switch branches & pull in new changes from remote Ensembl repositories. It also provides a way of addressing multiple repositories by a group name and applying the previously mentioned functions over those groups.
 
-All repositories are cloned using HTTPS as since Git version 1.7.10 the 
-HTTPS protocol has been significantly changed to be as efficient as the
-SSH and Git protocols.
+All repositories are cloned using HTTPS as since Git version 1.7.10 the HTTPS protocol has been significantly changed to be as efficient as the SSH and Git protocols.
 
-B<If you are making a read/write clone make sure you specify your username via
-the --user command line argument. Otherwise Git will use your default 
-authentication details.>
+B<If you are making a read/write clone make sure you specify your username via the --user command line argument. Otherwise Git will use your default authentication details.>
 
-=head1 CONFIGURATION
+=head1 SCRIPT CONFIGURATION
 
-This script ships with a number of default configurations. You can add 
-to these if they are in the default global location 
-C<~ensembl/git-ensembl.groups> or your home directory at 
-C<~/git-ensembl.groups>. The format is a permissive JSON file (
-accepting comments and tollerant to formatting/trailing 
-punctuation) like so:
+This script ships with a number of default configurations. You can add to these if they are in the default global location C<~ensembl/git-ensembl.groups> or your home directory at C<~/git-ensembl.groups>. The format is a permissive JSON file (accepting comments and tollerant to formatting/trailing punctuation) like so:
 
     {
       "groupname" : {
@@ -394,15 +426,47 @@ Configuration is resolved in the following order
 
 =over 8
 
-=item User configuration
+=item * User configuration
 
-=item Central configuration
+=item * Central configuration
 
-=item Default configuration
+=item * Default configuration
 
 =back
 
 When a clashing group is named the higher priority group takes precedence.
+
+=head1 GIT REMOTE CLONE CONFIGURATION
+
+B<PLEASE ONLY READ THIS IF YOU NEED WRITE ACCESS TO REPOSITORIES>
+
+This script uses two Git transport mechanisms; HTTPS and SSH. Please see the following two sections about how to configure both for read/write access. Make sure you clone using the B<--github_user> and B<--github_email> should you not want to clone using your default Git username and email.
+
+=head2 HTTPS
+
+By default this script clones using HTTPS. We normally clone using the base URL B<https://github.com/>. This uses your default username and password. If you have never specfiied these Git will ask for them on your first clone.
+
+Should you need to use another user account you can give a different username. You must run this script using the B<--user> command argument.
+
+=head2 SSH
+
+You can switch to SSH using the B<--ssh> command. By default the server is github.com but you can change this by using the B<--server> command line argument.
+
+=head3 SSH CONFIG
+
+Here we have configured two hostnames and have associcated a different SSH key to each one. You can follow the guide about how to generate a new SSH key and add it to your GitHub account from here https://help.github.com/articles/generating-ssh-keys
+
+    Host github.com
+      HostName github.com
+      PreferredAuthentications publickey
+      IdentityFile ~/.ssh/id_rsa_github
+      User git
+
+    Host ensembl.github.com
+      HostName github.com
+      PreferredAuthentications publickey
+      IdentityFile ~/.ssh/id_rsa_github_ensembl
+      User git
 
 =head1 OPTIONS
 
@@ -415,6 +479,26 @@ The groups to perform actions on. Use B<--list> to find all available groups
 =item B<--clone>
 
 Clone the repositories linked to the given group (Ensembl's remote hosted on GitHub)
+
+=item B<--user | --username>
+
+The username to use when cloning from HTTPS
+
+=item B<--ssh>
+
+Use the SSH protocol for cloning rather than HTTPS. HTTPS is the default clone protocol
+
+=item B<--server>
+
+Use the following server for cloning in preference to B<github.com>
+
+=item B<--github_user | --github_username>
+
+Set the config variable B<user.name> for this clone.
+
+=item B<--github_email>
+
+Set the config variable B<user.email> for this clone.
 
 =item B<--checkout>
 

@@ -15,7 +15,8 @@ our @EXPORT = qw/
   is_git_repo is_tree_clean is_origin_uptodate
   clone checkout checkout_tracking pull fetch rebase ff_merge git_push
   rev_parse branch_exists
-  get_config prompt
+  get_config add_config unset_all_config
+  prompt
 /;
 
 # Take a path, slurp and convert to a Perl data structure
@@ -127,6 +128,18 @@ sub get_config {
   my ($output) = cmd("git config --get $config");
   chomp $output;
   return $output;
+}
+
+# Unset all config variables
+sub unset_all_config {
+  my ($config) = @_;
+  return system_ok("git config --local --unset-all '${config}'");
+}
+
+# Add a config variable
+sub add_config {
+  my ($config, $value) = @_;
+  return system_ok("git config --local --add '${config}' '${value}'");
 }
 
 # Convert a ref symbol into a SHA-1 hash
