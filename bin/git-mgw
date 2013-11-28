@@ -210,22 +210,34 @@ git-mgw - Perform the Minimal Git Workflow
 
 =head1 SYNOPSIS
 
-git mgw [-source BRANCH] [-target BRANCH] [-nopush] [-noprompt] [-h] [-m]
+git mgw [--rebase | --merge] [-source BRANCH] [-target BRANCH] [-nopush] [-noprompt] [-h] [-m]
 
 =head1 DESCRIPTION
 
-Provides the Git minimal workflow which is an Anacode flow. It involves
+Provides the Minimal Git Workflow which is an Anacode flow. It involves
 developing code on to a non-tracking branch (dev), rebasing
 against a tracking target (master), merging target with source and then 
 pushing the resulting fast forward merge to origin.
+
+A second strategy can be used which forces a non-fast forward merge
+and promotes "bubbles" of development. This is a useful strategy for
+branches/ref which have been shared to a remote.
 
 =head1 OPTIONS
 
 =over 8
 
+=item B<--rebase>
+
+Use the rebase strategy. Can only be applied to a source branch which is not remote tracking.
+
+=item B<--merge>
+
+Use the merge strategy. Safe with all types of branches.
+
 =item B<--source>
 
-The source branch of changes. Defaults to dev. Cannot be a remote tracking branch
+The source branch of changes. Defaults to dev. Cannot be a remote tracking branch if using the --rebase strategy
 
 =item B<--target>
 
