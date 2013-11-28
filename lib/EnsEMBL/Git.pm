@@ -17,6 +17,7 @@ our @EXPORT = qw/
   rev_parse branch_exists
   get_config add_config unset_all_config
   prompt
+  system_ok cmd cmd_ok
 /;
 
 # Take a path, slurp and convert to a Perl data structure
