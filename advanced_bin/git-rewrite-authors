@@ -1,0 +1,163 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+BEGIN {
+  use File::Basename;
+  use File::Spec;
+  my $dirname = dirname(__FILE__);
+  my $lib = File::Spec->catdir($dirname, File::Spec->updir(), 'lib');
+  if(-d $lib) {
+    unshift(@INC, $lib);
+  }
+  else {
+    die "Cannot find the lib directory in the expected location $lib";
+  }
+};
+
+use Pod::Usage;
+use Getopt::Long;
+use EnsEMBL::Git;
+
+run();
+
+sub run {
+  my $opts = parse_command_line();
+
+  sanity_checks($opts);
+
+  if($opts->{list}) {
+    if(! system_ok('git log | grep Author: | sort | uniq')) {
+      print STDERR "Could not extract the current list of authors. Not sure why. Run git log to see the output\n";
+      exit 2;
+    }
+  }
+  else {
+    my ($old_name, $old_email) = _separate_identity($opts->{old});
+    my ($new_name, $new_email) = _separate_identity($opts->{new});
+    _filter('AUTHOR', $old_name, $old_email, $new_name, $new_email);
+    _filter('COMMITTER', $old_name, $old_email, $new_name, $new_email);
+    print "* DONE\n";
+  }
+
+  exit 0;
+}
+
+sub parse_command_line {
+  my $opts = {
+    list => 0,
+    help => 0,
+    man => 0
+  };
+
+  GetOptions($opts, qw/
+    old=s
+    new=s
+    list
+    help|?
+    man
+  /) or pod2usage(2);
+
+  pod2usage(1) if $opts->{help};
+  pod2usage(-exitval => 0, -verbose => 2) if $opts->{man};
+
+  return $opts;
+}
+
+sub sanity_checks {
+  my ($opts) = @_;
+  my $list = $opts->{list};
+  my $old = $opts->{new};
+  my $new = $opts->{old};
+
+  if(! $list) {
+    if(! $old || ! $new) {
+      pod2usage(-exitval => 1, -verbose => 1, -msg => 'You need to specify an --old and --new parameter to re-attribute commits');
+    }
+
+    print   "* Original identity is '$old'\n";
+    print   "* New identity is '$new'\n";
+    if(! prompt()) {
+      print STDERR "! Aborting on user request\n";
+      exit 2;
+    }
+  }
+
+  if(!is_git_repo()) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => 'Current directory is not a Git repository');
+  }
+
+  return;
+}
+
+sub _filter {
+  my ($type, $old_name, $old_email, $new_name, $new_email) = @_;
+  print "* Filtering on GIT_${type}_NAME and GIT_${type}_EMAIL\n";
+  my $tmpl = <<'TMPL';
+git filter-branch --env-filter 'if [ "$GIT_%1$s_NAME" == "%2$s" -a "$GIT_%1$s_EMAIL" == "%3$s" ]; then GIT_%1$s_NAME="%4$s"; GIT_%1$s_EMAIL="%5$s"; fi; export GIT_%1$s_NAME; export GIT_%1$s_EMAIL' --tag-name-filter cat -f -- --all
+TMPL
+  my $cmd = sprintf($tmpl, $type, $old_name, $old_email, $new_name, $new_email);
+  if(!system_ok($cmd)) {
+    print STDERR "! Cannot perform the branch filtering\n";
+    exit 3;
+  }
+}
+
+sub _separate_identity {
+  my ($identity) = @_;
+  my ($name, $email) = $identity =~ /([A-Za-z\(\)\. ]+)\s+<(.*)>/xms;
+  return ($name, $email);
+}
+
+__END__
+=pod
+
+=head1 NAME
+
+git-rewrite-authors - Rewrite the history of a repository
+
+=head1 SYNOPSIS
+
+  git rewrite-authors [--list] [--old OLD ID] [-new NEW ID] [-h] [-m]
+
+  # Print out all authors
+  git rewrite-authors --list
+
+  # Modify an author
+  git rewrite-authors -old 'My User <user@somewhere.com>' -new 'My Real Name <mynewid@email.com>'
+
+=head1 DESCRIPTION
+
+This script provides the ability to re-write your Git commit history to replace both AUTHOR and COMMITTER identities with something more useful. Be aware that this will cause the recomputation of hashes in the repository and can cause inconsistent origin/local hash commits. 
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--list>
+
+List all available authors in a repo
+
+=item B<--old>
+
+The old identity. Please use the format B<Name <email>> e.g. B<My Name <my@email.com>>
+
+=item B<--new>
+
+The new identity. Please use the format B<Name <email>> e.g. B<My Name <my@email.com>>
+
+=item B<--help>
+
+Print the help information
+
+=item B<--man>
+
+Print a man page
+
+=back
+
+=cut
+
+
+
