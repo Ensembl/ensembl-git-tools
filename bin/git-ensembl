@@ -72,8 +72,8 @@ sub parse_command_line {
     groups
     list
     ssh
-    github_user|github_username=s
-    github_email=s
+    name=s
+    email=s
     help|?
     man
   /) or pod2usage(2);
@@ -111,11 +111,11 @@ sub run_clone {
     }
 
     # Now deal with config variables
-    if($opts->{github_user} || $opts->{github_email}) {
+    if($opts->{name} || $opts->{email}) {
       chdir($module);
       print "* Setting user/email config variables\n";
-      add_config('user.name', $opts->{github_user}) if $opts->{github_user};
-      add_config('user.email', $opts->{github_email}) if $opts->{github_email};
+      add_config('user.name', $opts->{name}) if $opts->{name};
+      add_config('user.email', $opts->{email}) if $opts->{email};
       chdir(File::Spec->updir());
     }
 
@@ -346,7 +346,8 @@ git-ensembl - Ensembl-centric Git Utility
 
 =head1 SYNOPSIS
 
-git ensembl [--clone [--user USR] ] [--checkout --branch BRANCH] 
+git ensembl [--clone [--name NAME] [--email EMAIL] ] 
+            [--checkout --branch BRANCH] 
             [--pull] [--fetch] [--dir DIR] [--groups] [--list] 
             [-v] [-h] [-m] GROUPS
 
@@ -358,10 +359,9 @@ git ensembl --list
 
 git ensembl --clone api
 
-# Clone, use a new user and set a new Git username and email
+# Clone and set a new Git username and email
 
-git ensembl --clone --user myusr --github_user 'Name' 
-  --github_email 'email@somewhere.com' api
+git ensembl --clone --user 'Name' --email 'email@somewhere.com' api
 
 # Clone using SSH
 
@@ -442,11 +442,11 @@ Clone the repositories linked to the given group (Ensembl's remote hosted on Git
 
 Use the SSH protocol for cloning rather than HTTPS. HTTPS is the default clone protocol
 
-=item B<--github_user | --github_username>
+=item B<--name>
 
 Set the config variable B<user.name> for this clone.
 
-=item B<--github_email>
+=item B<--email>
 
 Set the config variable B<user.email> for this clone.
 
