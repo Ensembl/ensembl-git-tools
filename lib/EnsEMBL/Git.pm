@@ -88,6 +88,12 @@ sub branch_exists {
   return cmd_ok("git show-ref --verify --quiet refs/${ref_loc}/${branch}");
 }
 
+# Attempt to find the given tag
+sub tag_exists {
+  my ($tag) = @_;
+  return cmd_ok("git show-ref --verify --quiet refs/tags/${tag}");
+}
+
 # Runs a pull on whatever is the current branch (which means fetch & merge)
 sub pull {
   my ($remote, $verbose) = @_;
@@ -120,6 +126,11 @@ sub rebase {
 sub ff_merge {
   my ($branch) = @_;
   return system_ok("git merge --ff-only $branch");
+}
+
+sub no_ff_merge($$) {
+  my ($branch, $message) = @_;
+  return system_ok(qq/git merge --no-ff --log -m '$message' ${branch}/);
 }
 
 # Get a config value out
