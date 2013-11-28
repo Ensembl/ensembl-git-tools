@@ -13,7 +13,7 @@ BEGIN {
 our @EXPORT = qw/
   json
   is_git_repo is_tree_clean is_origin_uptodate
-  clone checkout checkout_tracking pull fetch rebase ff_merge git_push
+  clone checkout checkout_tracking pull fetch rebase ff_merge no_ff_merge git_push
   rev_parse branch_exists
   get_config add_config unset_all_config
   prompt
