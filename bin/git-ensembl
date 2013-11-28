@@ -203,11 +203,16 @@ sub _loop_modules_and_chdir {
   _loop_modules($opts, $group, sub {
     my ($module, $remote) = @_;
     if (! -d $module) {
-      print STDERR "Skipping module as there is no directory called that; try 'git ensembl --clone'\n";
+      print STDERR "! Skipping module as there is no directory called that; try 'git ensembl --clone'\n";
       return;
     }
     chdir($module);
-    $callback->($module, $remote);
+    if(is_git_repo()) {
+      $callback->($module, $remote);
+    }
+    else {
+      print STDERR "! Skipping '${module}' because it is not a Git directory\n";
+    }
     chdir(File::Spec->updir());
     return;
   });
