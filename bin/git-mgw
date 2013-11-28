@@ -44,7 +44,10 @@ sub run {
     exit 4;
   }
   my $current_sha1 = rev_parse('HEAD');
-  rebase($trg);
+  if(!rebase($trg)) {
+    print STDERR "! Could not finish rebase. Please check the error messages for the reason why\n";
+    exit 5;
+  }
 
   print "* Please take a moment to review your changes.\n";
   print "* Example cmd: git log --oneline --reverse ${trg}..${src}\n";
@@ -52,7 +55,7 @@ sub run {
     print STDERR "! Process has been abandoned. Please review the changes\n";
     print STDERR  "! You can reset the current changes using the following command (this will re-write your history and ref pointers)\n";
     print STDERR  "! git reset $current_sha1\n";
-    exit 5;
+    exit 6;
   }
 
   # Now back to master and merge
@@ -60,9 +63,12 @@ sub run {
   print "* Checking that $trg is at the same revision as origin/$trg\n";
   if(!is_origin_uptodate($trg)) {
     print STDERR "! Local and remote branches are not on the same hash. Cannot continue\n";
-    exit 6;
+    exit 7;
   }
-  ff_merge($src);
+  if(! ff_merge($src)) {
+    print STDERR "! Could not perform fast-forward merge of '${src}' into '${trg}'\n";
+    exit 8;
+  }
 
   if($opts->{nopush}) {
     print "* Leaving changes on $trg and not pushing\n";
@@ -71,10 +77,13 @@ sub run {
     print "* About to push to origin\n";
     if(! $opts->{noprompt} && ! prompt()) {
       print STDERR "! Abandoned changes\n";
-      exit 7;
+      exit 9;
     }
 
-    git_push('origin', 'verbose');
+   if(!git_push('origin', 'verbose')) {
+      print STDERR "! Could not push back to origin. WARNING ON STILL ON '${trg}'\n";
+      exit 10;
+    }
     print "* Finished and pushed changes to origin\n";
   }
 
