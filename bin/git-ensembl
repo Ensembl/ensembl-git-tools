@@ -72,8 +72,6 @@ sub parse_command_line {
     groups
     list
     ssh
-    server=s
-    user|username=s
     github_user|github_username=s
     github_email=s
     help|?
@@ -104,17 +102,6 @@ sub run_clone {
     if ( -d $module) {
       print STDERR "! Skipping module as there is already a directory called that; try 'git ensembl --pull'\n";
       return;
-    }
-
-    my $usr = $opts->{user};
-    if($remote =~ /^https/ && $usr) {
-      print "* Using the HTTPS protocol with username $usr\n";
-      $remote =~ s/github\.com/$usr\@github.com/;
-    }
-    my $ssh_srv = $opts->{server};
-    if($remote =~ /^ssh/ && $ssh_srv) {
-      print "* Using the SSH protocol with server $ssh_srv\n";
-      $remote =~ s/github\.com/$ssh_srv/;
     }
 
     print "* Cloning from remote '${remote}'\n";
@@ -371,18 +358,14 @@ git ensembl --list
 
 git ensembl --clone api
 
-# Clone as a specific GitHub user
-
-git ensembl --clone --user myusr api
-
 # Clone, use a new user and set a new Git username and email
 
 git ensembl --clone --user myusr --github_user 'Name' 
   --github_email 'email@somewhere.com' api
 
-# Clone using SSH and specify an alternative server name (see later for info about how to configure multiple GitHub accounts over SSH)
+# Clone using SSH
 
-git ensembl --clone --ssh --server ensembl.github.com
+git ensembl --clone --ssh api
 
 # Pull in new changes (merges into each repo's current branch)
 
@@ -443,38 +426,6 @@ Configuration is resolved in the following order
 
 When a clashing group is named the higher priority group takes precedence.
 
-=head1 GIT REMOTE CLONE CONFIGURATION
-
-B<PLEASE ONLY READ THIS IF YOU NEED WRITE ACCESS TO REPOSITORIES>
-
-This script uses two Git transport mechanisms; HTTPS and SSH. Please see the following two sections about how to configure both for read/write access. Make sure you clone using the B<--github_user> and B<--github_email> should you not want to clone using your default Git username and email.
-
-=head2 HTTPS
-
-By default this script clones using HTTPS. We normally clone using the base URL B<https://github.com/>. This uses your default username and password. If you have never specfiied these Git will ask for them on your first clone.
-
-Should you need to use another user account you can give a different username. You must run this script using the B<--user> command argument.
-
-=head2 SSH
-
-You can switch to SSH using the B<--ssh> command. By default the server is github.com but you can change this by using the B<--server> command line argument.
-
-=head3 SSH CONFIG
-
-Here we have configured two hostnames and have associcated a different SSH key to each one. You can follow the guide about how to generate a new SSH key and add it to your GitHub account from here https://help.github.com/articles/generating-ssh-keys
-
-    Host github.com
-      HostName github.com
-      PreferredAuthentications publickey
-      IdentityFile ~/.ssh/id_rsa_github
-      User git
-
-    Host ensembl.github.com
-      HostName github.com
-      PreferredAuthentications publickey
-      IdentityFile ~/.ssh/id_rsa_github_ensembl
-      User git
-
 =head1 OPTIONS
 
 =over 8
@@ -487,17 +438,9 @@ The groups to perform actions on. Use B<--list> to find all available groups
 
 Clone the repositories linked to the given group (Ensembl's remote hosted on GitHub)
 
-=item B<--user | --username>
-
-The username to use when cloning from HTTPS
-
 =item B<--ssh>
 
 Use the SSH protocol for cloning rather than HTTPS. HTTPS is the default clone protocol
-
-=item B<--server>
-
-Use the following server for cloning in preference to B<github.com>
 
 =item B<--github_user | --github_username>
 
