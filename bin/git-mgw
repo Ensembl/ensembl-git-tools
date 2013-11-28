@@ -29,6 +29,8 @@ sub run {
 
   my $src = $opts->{source};
   my $trg = $opts->{target};
+  my $merge = $opts->{merge};
+  my $rebase = $opts->{rebase};
 
   # Checkout target and get latest changes
   checkout($trg);
@@ -43,31 +45,54 @@ sub run {
     print STDERR "! Cannot continue; tree is not clean and rebases can fail\n";
     exit 4;
   }
-  my $current_sha1 = rev_parse('HEAD');
-  if(!rebase($trg)) {
-    print STDERR "! Could not finish rebase. Please check the error messages for the reason why\n";
-    exit 5;
+
+  # Start the rebase strategy
+  if($rebase) {
+    my $current_sha1 = rev_parse('HEAD');
+
+    if(!rebase($trg)) {
+      print STDERR "! Could not finish rebase. Please check the error messages for the reason why\n";
+      exit 5;
+    }
+
+    print "* Please take a moment to review your changes.\n";
+    print "* Example cmd: git log --oneline --reverse ${trg}..${src}\n";
+    if(! $opts->{noprompt} && ! prompt()) {
+      print STDERR "! Process has been abandoned. Please review the changes\n";
+      print STDERR  "! You can reset the current changes using the following command (this will re-write your history and ref pointers)\n";
+      print STDERR  "! git reset $current_sha1\n";
+      exit 6;
+    }
   }
 
-  print "* Please take a moment to review your changes.\n";
-  print "* Example cmd: git log --oneline --reverse ${trg}..${src}\n";
-  if(! $opts->{noprompt} && ! prompt()) {
-    print STDERR "! Process has been abandoned. Please review the changes\n";
-    print STDERR  "! You can reset the current changes using the following command (this will re-write your history and ref pointers)\n";
-    print STDERR  "! git reset $current_sha1\n";
-    exit 6;
-  }
-
-  # Now back to master and merge
+  # Now back to 'master' and merge if remote and local are in sync
   checkout($trg);
   print "* Checking that $trg is at the same revision as origin/$trg\n";
   if(!is_origin_uptodate($trg)) {
     print STDERR "! Local and remote branches are not on the same hash. Cannot continue\n";
     exit 7;
   }
-  if(! ff_merge($src)) {
-    print STDERR "! Could not perform fast-forward merge of '${src}' into '${trg}'\n";
-    exit 8;
+  
+  # Merges use non-fast-forward and ask the user to confirm the final merge
+  if($merge) {
+    if(! no_ff_merge($src, "Automatic merging of $src into $trg")) {
+      print STDERR "! Could not perform non-fast-forward merge of '${src}' into '${trg}'\n";
+      exit 8;
+    }
+    print "* Please take a moment to review your changes\n";
+    print "* Example cmd: git log --oneline --reverse ${trg}..${src}\n";
+    if(! $opts->{noprompt} && ! prompt()) {
+      print STDERR "! Abandoned work\n";
+      exit 8;
+    }
+  }
+
+  # Rebases need only do a ff merge since we've made sure it's going to be ok
+  if($rebase) {
+    if(! ff_merge($src)) {
+      print STDERR "! Could not perform fast-forward merge of '${src}' into '${trg}'\n";
+      exit 8;
+    }
   }
 
   if($opts->{nopush}) {
@@ -101,6 +126,8 @@ sub parse_command_line {
     target => 'master',
     nopush => 0,
     noprompt => 0,
+    merge => 0,
+    rebase => 0,
     help => 0,
     man => 0
   };
@@ -110,6 +137,8 @@ sub parse_command_line {
     target=s
     nopush!
     noprompt!
+    merge
+    rebase
     help|?
     man
   /) or pod2usage(2);
@@ -121,15 +150,22 @@ sub parse_command_line {
 }
 
 # Do ALOT of checks before we can proceed. 
-# 1) Make sure thisis a Git repo
-# 2) Check the branches exist
-# 3) Make sure src does not track a repo (otherwise rebase is bad)
-# 4) Confirm with the user
+# 1) Check we have a strategy and just 1 at that
+# 2) Make sure this is a Git repo
+# 3) Check the branches exist
+# 4) Make sure src does not track a repo (otherwise rebase is bad) if using --rebase
+# 5) Confirm with the user
 sub sanity_checks {
   my ($opts) = @_;
   my $src = $opts->{source};
   my $trg = $opts->{target};
 
+  if(! $opts->{merge} && ! $opts->{rebase}) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => 'You need to specify the --rebase or --merge strategy');
+  }
+  if($opts->{merge} && $opts->{rebase}) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => 'Specify either --rebase or --merge');
+  }
   if(! is_git_repo()) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'Current directory is not a Git repository');
   }
@@ -140,20 +176,23 @@ sub sanity_checks {
     pod2usage(-exitval => 1, -verbose => 1, -msg => "The branch $trg does not exist. Rerun with --target"); 
   }
 
-  my $src_merge = get_config("branch.${src}.merge");
-  my $src_remote = get_config("branch.${src}.remote");
+  if($opts->{rebase}) {
+    my $src_merge = get_config("branch.${src}.merge");
+    my $src_remote = get_config("branch.${src}.remote");
 
-  if($src_merge) {
-    pod2usage(-exitval => 1, -verbose => 1, 
-      -msg => "The $src branch is setup to merge with '$src_merge'. Do not do this. This branch must be a local branch non-tracking branch"); 
-  }
-  if($src_remote) {
-    pod2usage(-exitval => 1, -verbose => 1, 
-      -msg => "The $src branch is tracking a remote '$src_remote'. Do not do this. This branch must be a local branch non-tracking branch"); 
+    if($src_merge) {
+      pod2usage(-exitval => 1, -verbose => 1, 
+        -msg => "The $src branch is setup to merge with '$src_merge'. Do not do this. This branch must be a local branch non-tracking branch"); 
+    }
+    if($src_remote) {
+      pod2usage(-exitval => 1, -verbose => 1, 
+        -msg => "The $src branch is tracking a remote '$src_remote'. Do not do this. This branch must be a local branch non-tracking branch"); 
+    }
   }
 
-  print "* Source branch is '$src'\n";
-  print "* Target branch is '$trg'\n";
+  printf  "* MGW strategy is '%s'\n", ( $opts->{merge} ? 'merge' : 'rebase');
+  print   "* Source branch is '$src'\n";
+  print   "* Target branch is '$trg'\n";
   if(! $opts->{noprompt} && ! prompt()) {
     print STDERR "! Aborting on user request\n";
     exit 2;
