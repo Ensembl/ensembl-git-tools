@@ -143,6 +143,8 @@ sub run_checkout {
   my $branch = $opts->{branch};
   my $verbose = $opts->{verbose};
   _loop_modules_and_chdir($opts, $group, sub {
+    print "* Fetching from origin before checking out\n";
+    fetch($verbose);
     print "* Checking out branch '${branch}'\n";
     if(! checkout_tracking($branch, 'origin', $verbose)) {
       printf STDERR "! Cannot switch to ${branch}\n";
