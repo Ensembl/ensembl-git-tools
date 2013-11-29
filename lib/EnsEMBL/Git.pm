@@ -1,3 +1,21 @@
+=head1 LICENSE
+
+Copyright [1999-2013] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
+
 package EnsEMBL::Git;
 
 use parent qw/Exporter/;
@@ -14,7 +32,7 @@ our @EXPORT = qw/
   json
   is_git_repo is_tree_clean is_origin_uptodate
   clone checkout checkout_tracking pull fetch rebase ff_merge no_ff_merge git_push
-  rev_parse branch_exists
+  rev_parse branch_exists current_branch
   get_config add_config unset_all_config
   prompt
   system_ok cmd cmd_ok
@@ -159,6 +177,13 @@ sub add_config {
 sub rev_parse {
   my ($rev) = @_;
   my ($output) = cmd("git rev-parse $rev");
+  chomp $output;
+  return $output;
+}
+
+# Returns the name of the current branch
+sub current_branch {
+  my ($output) = cmd('git rev-parse --abbrev-ref HEAD');
   chomp $output;
   return $output;
 }
