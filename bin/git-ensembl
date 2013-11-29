@@ -158,6 +158,7 @@ sub run_pull {
 
     print "* Performing pull\n";
     pull('origin', $verbose);
+    fetch('tags', $verbose);
 
     return;
   });
@@ -169,7 +170,8 @@ sub run_fetch {
   _loop_modules_and_chdir($opts, $group, sub {
     my ($module) = @_;
     print "* Performing fetch\n";
-    fetch($opts->{verbose});
+    fetch(undef, $opts->{verbose});
+    fetch('tags', $verbose);
     return;
   });
   return;
@@ -458,9 +460,13 @@ Checkout the branch specified in the B<--branch> command
 
 Branch to switch to. Used in conjunction with the B<--checkout> and B<--pull> commands
 
+=item B<--fetch>
+
+Fetch changes from origin and also fetch any tags
+
 =item B<--pull>
 
-Perform a pull from origin (Ensembl's remote hosted on GitHub)
+Perform a pull from origin (Ensembl's remote hosted on GitHub) and all tags
 
 =item B<--dir>
 

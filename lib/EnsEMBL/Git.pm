@@ -113,9 +113,10 @@ sub git_push {
 
 # Runs a fetch on origin but unlike pull will not do the merge
 sub fetch {
-  my ($verbose) = @_;
+  my ($fetch_tags, $verbose) = @_;
   my $v = $verbose ? '--verbose' : q{};
-  return system_ok("git fetch $v origin");
+  my $tags = ($fetch_tags) ? '--tags' : q{};
+  return system_ok("git fetch $v $tags origin");
 }
 
 # Rebases against the given branch
