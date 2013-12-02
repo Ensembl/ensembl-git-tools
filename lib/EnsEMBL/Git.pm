@@ -175,8 +175,9 @@ sub add_config {
 
 # Convert a ref symbol into a SHA-1 hash
 sub rev_parse {
-  my ($rev) = @_;
-  my ($output) = cmd("git rev-parse $rev");
+  my ($rev, $short) = @_;
+  my $short_arg = $short ? '--short' : q{};
+  my ($output) = cmd("git rev-parse $short_arg $rev");
   chomp $output;
   return $output;
 }
