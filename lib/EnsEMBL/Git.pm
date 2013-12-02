@@ -264,7 +264,6 @@ sub cmd_ok {
 
 # Prompt the user for confirmation
 sub prompt {
-  my ($msg) = @_;
   print '* OK to continue? (y/N)... ';
   my $in = <STDIN>;
   chomp $in;
