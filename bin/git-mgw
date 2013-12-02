@@ -73,8 +73,8 @@ sub run {
     print "* Example cmd: git log --oneline --reverse ${trg}..${src}\n";
     if(! $opts->{noprompt} && ! prompt()) {
       print STDERR "! Process has been abandoned. Please review the changes\n";
-      print STDERR  "! You can reset the current changes using the following command (this will re-write your history and ref pointers)\n";
-      print STDERR  "! git reset $current_sha1\n";
+      print STDERR "! You can reset the current changes using the following command (this will re-write your history and ref pointers)\n";
+      print STDERR "! git reset $current_sha1\n";
       exit 6;
     }
   }
