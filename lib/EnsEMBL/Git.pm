@@ -35,7 +35,7 @@ our @EXPORT = qw/
   rev_parse branch_exists current_branch
   get_config add_config unset_all_config
   prompt
-  system_ok cmd cmd_ok
+  system_ok cmd cmd_ok safe_cwd
 /;
 
 # Take a path, slurp and convert to a Perl data structure
@@ -261,6 +261,15 @@ sub cmd_ok {
   my ($cmd) = @_;
   my ($output, $exitcode) = cmd($cmd);
   return $exitcode == 0 ? 1 : 0;
+}
+
+# Done to cd to a target dir, run some code and then go back
+sub safe_cwd {
+  my ($dir, $callback) = @_;
+  my $cwd = cwd();
+  chdir $dir;
+  $callback->();
+  chdir $cwd;
 }
 
 # Prompt the user for confirmation
