@@ -1,0 +1,342 @@
+#!/usr/bin/env perl
+# Copyright [1999-2013] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#      http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+use strict;
+use warnings;
+
+BEGIN {
+  use File::Basename;
+  use File::Spec;
+  my $dirname = dirname(__FILE__);
+  my $lib = File::Spec->catdir($dirname, File::Spec->updir(), 'lib');
+  if(-d $lib) {
+    unshift(@INC, $lib);
+  }
+  else {
+    die "Cannot find the lib directory in the expected location $lib";
+  }
+};
+
+use Pod::Usage;
+use Getopt::Long;
+use EnsEMBL::Git;
+use Cwd;
+use File::Spec;
+use File::Copy qw/copy/;
+
+run();
+
+sub run {
+  my $opts = parse_command_line();
+
+  # Check what the current CVS branch is
+  sanity_checks($opts);
+
+  # Get the branch refs and switch
+  my ($src, $trg) = map {rev_parse($_, 'short')} ($opts->{commitid}, $opts->{target_commitid});
+  print "* Processing changes from $src to $trg into CVS\n";
+  print "* Switching git repo to $src\n";
+  checkout($src);
+
+  # Diff CVS vs. Git src ref (should be the same right)
+  my $cvs_branch = $opts->{current_cvs_branch};
+  print "* Checking Git \@ $src agrees with $cvs_branch\n".
+  diff_git_cvs($opts);
+  # Move Git back to the target ref
+  checkout($trg);
+
+  # Grab the list of changes and copy/rm the appropriate changes across
+  my $changes = git_diff_file_status($src, $trg);
+  foreach my $change (@{$changes}) {
+    my ($status, $file) = @{$change};
+    if($status eq 'D') {
+      print "* DELETED  $file\n";
+      my $target = File::Spec->catfile($opts->{cvs}, $file);
+      if(-f $target) {
+        unlink($target) or die "Cannot unlink file ${target}: $!\n";
+      }
+    }
+    elsif($status eq 'A') {
+      print "* ADDED    $file\n";
+      copy_to_cvs($opts, $file);
+    }
+    elsif($status eq 'M') {
+      print "* MODIFIED $file\n";
+      copy_to_cvs($opts, $file);
+    }
+    else {
+      die "Do not understand the status $status";
+    }
+  }
+
+  # Diff the repos; post copying they should be in agreement over what has changed
+  print "* Checking Git \@ $trg agrees with new version of $cvs_branch\n".
+  diff_git_cvs($opts);
+
+  # Now that's done loop through and commit the changes
+  foreach my $change (@{$changes}) {
+    my ($status, $file) = @{$change};
+    if($status eq 'D') {
+      print "* DELETED   $file\n";
+      rm_from_cvs($opts, $file);
+    }
+    elsif($status eq 'A') {
+      print "* ADDED     $file\n";
+      add_to_cvs($opts, $file);
+    }
+    print "* COMMITTED $file\n";
+    commit_cvs($opts, $file);
+  }
+
+  print "* DONE\n";
+
+  exit 0;
+}
+
+sub parse_command_line {
+  my $opts = {
+    target_commitid => 'HEAD',
+    git => cwd(),
+    exclude => [],
+    'dry-run' => 0,
+    help => 0,
+    man => 0
+  };
+
+  GetOptions($opts, qw/
+    cvs=s
+    target_commitid=s
+    commitid=s
+    exclude=s@
+    dry-run
+    help|?
+    man
+  /) or pod2usage(2);
+
+  pod2usage(1) if $opts->{help};
+  pod2usage(-exitval => 0, -verbose => 2) if $opts->{man};
+
+  return $opts;
+}
+
+sub sanity_checks {
+  my ($opts) = @_;
+
+  if(!is_git_repo()) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => 'Current directory is not a Git repository');
+  }
+
+  my $current_cvs_branch = current_cvs_branch($opts);
+  $opts->{current_cvs_branch} = $current_cvs_branch;
+  my $current_git_branch = current_branch();
+  $opts->{current_git_branch} = $current_git_branch;
+
+  print "* Current CVS branch is: $current_cvs_branch\n";
+  print "* Current Git branch is: $current_git_branch\n";
+  if(!prompt()) {
+    print STDERR "! Process has been abandoned\n";
+  }
+
+  return;
+}
+
+# Returns a 2D array of status to file (the overall change that is). Status can be set to
+# M == modified
+# D == deleted
+# A == added
+#
+# Used to generate the total list of change. We do not worry about generating diffs
+# but to copy files that have changed and leave that up to CVS to deal with (like
+# binary files which you have to detect using Perl's -B test switch)
+sub git_diff_file_status {
+  my ($ref, $target_ref) = @_;
+  my ($output, $rc) = cmd("git diff --name-status $ref $target_ref");
+  if($rc != 0) {
+    print STDERR "! Cannot perform a diff between $ref and $target_ref\n";
+    exit 4;
+  }
+  return [ map { [ split(/\s+/, $_) ] } map { chomp } split(/\n/, $output) ];
+}
+
+# Go to the CVS directory and attempt to find what branch it is on by looking for sticky tags. The lack of
+# a sticky tag must mean we are on head
+sub current_cvs_branch {
+  my ($opts) = @_;
+
+  my $cvs_branch = 'HEAD';
+
+  safe_cwd($opts->{cvs}, sub {  
+    my @files = grep { -f $_ } <*>;
+    die 'Cannot find any files in the CVS directory'. $opts->{cvs};
+    foreach my $f (@files) {
+      my $base = basename($f);
+      warn "inspecting $base for cvs branch tag";
+      #Get the status of the branch
+      my ($status, $rc) = cmd(qq{cvs -Q status $base | grep 'Status:'});
+      if($rc != 0) {
+        print STDERR "Cannot get the CVS status of the file $base\n";
+        exit 3;
+      }
+      chomp $status;
+      if($status =~ /Status: Up-to-date/) {
+        my ($sticky_tag, $st_rc) = cmd(qq{cvs status $base | grep 'Sticky Tag:'});
+        if($rc != 0) {
+          print STDERR "Cannot get the CVS sticky tag of the file $base\n";
+          exit 3;
+        }
+        chomp $sticky_tag;
+        my ($tag) = $sticky_tag =~ /Sticky tag:\s+([-a-z0-9_()]+)/i;
+        # If we've got a live one exit ASAP
+        if($tag ne '(none)') {
+          $cvs_branch = $tag;
+          last;
+        }
+      }
+    }
+  });
+  return $cvs_branch;
+}
+
+# Performs a diff between CVS and Git assuming that the contents should be identical. If not
+# we bail
+sub diff_git_cvs {
+  my ($opts) = @_;
+  my $cvs = $opts->{cvs};
+  my $git = cwd();
+  my @default_exclusions = qw/CVS .git .DS_Store/;
+  my $exclusions = join(q{ }, map { "--exclude='${_}'" } (@default_exclusions, @{$opts->{exclude}}));
+  my $cmd = "diff $exclusions -ru ${cvs} ${git}";
+  if(!cmd_ok($cmd)) {
+    print STDERR "! Cannot continue. CVS and Git diffs do not agree\n";
+    print STDERR "! Ran the diff '$cmd'\n";
+    exit 5;
+  }
+  return;
+}
+
+# Copies a file from the Git dir to the target dir
+sub copy_to_cvs {
+  my ($opts, $file) = @_;
+  my $source_file = File::Spec->catdir($opts->{git}, $file);
+  my $target_file = File::Spec->catdir($opts->{cvs}, $file);
+  copy($source_file, $target_file) or die "Cannot copy $source_file to $target_file.";
+  return;
+}
+
+# Change to the CVS dir, run the add and change back
+sub add_to_cvs {
+  my ($opts, $file) = @_;
+  return if $opts->{'dry-run'};
+  safe_cwd($opts->{cvs}, sub {
+    my $kb_flag = (-B $file) ? '--kb' : q{};
+    my ($output, $rc) = cmd("cvs add $kb_flag $file");
+    if($rc != 0) {
+      # We can get the output "cvs add: `file' already exists, with version number 1.2"
+      # which means we have it in there already so no needs to worry
+      if($output !~ /already exists.+version number/i) {
+        print STDERR "! Cannot add the file $file due to an error whilst adding: $output";
+        exit 5;
+      }
+    }
+  });
+  return;
+}
+
+# Change to the CVS dir, run the rm and change back
+sub rm_from_cvs {
+  my ($opts, $file) = @_;
+  return if $opts->{'dry-run'};
+  safe_cwd($opts->{cvs}, sub {
+    if(-f $file) {
+      unlink $file or die "Cannot unlink $file: $!";
+    }
+    my ($output, $rc) = cmd("cvs rm $file");
+    if($rc != 0) {
+      print STDERR "!Cannot remove the file $file due to an error: $output";
+      exit 5;
+    }
+  });
+  return;
+}
+
+# Commit into CVS with a standard message
+sub commit_cvs {
+  my ($opts) = @_;
+  safe_cwd($opts->{cvs}, sub {
+    my ($src, $trg) = map {rev_parse($_, 'short')} ($opts->{commitid}, $opts->{target_commitid});
+    if(!system_ok('cvs commit -m "GIT-SIMPLECVS: Committing the changes accumulated from Git ref $src to $trg. See our Git repository for more information about these changes"')) {
+      print STDERR "!Died whilst committing changes to CVS";
+      exit 6;
+    }
+  });
+  return;
+}
+
+__END__
+=pod
+
+=head1 NAME
+
+git-simplecvs - A simpler version of git-cvsexportcommit
+
+=head1 SYNOPSIS
+
+  git simplecvs [--cvs DIR] [--target_commitid GIT_REF] [--commitid GIT_REF] [--exclude EXCLUDE] [--dry-run] [-h] [-m]
+
+  # Apply the changes from 3 commits ago to HEAD on the current branch
+  git simplecvs --cvs /path/to/cvs/sanbox --commitid HEAD^^^
+
+=head1 DESCRIPTION
+
+This script provides a mechanism to apply the changes of a Git repository between two points to a CVS repository. There is no attempt made to maintain the commit history of these changes. Instead the script computes the sum difference between the commit refs, deletes/adds any changes and then commits with a standard commit message. Should you wish to maintain history please use the far superior C<git-cvsexportcommit>.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--cvs>
+
+Location of the CVS sandbox to apply changes to. This MUST be already on the required target branch
+
+=item B<--commitid>
+
+The parent/old commit id of the last application of changes. This can be any valid git ref including HEAD, branch/tag refs, revisions WRT these refs or commit SHA-1 hashes.
+
+=item B<--target_commitid>
+
+The commit id to patch to. This can be any valid git ref including HEAD, branch/tag refs, revisions WRT these refs or commit SHA-1 hashes. Defaults to HEAD
+
+=item B<--exclude>
+
+Exclude the following files from any diff this program performs between CVS and Git. This is for when we expect two files to never be in sync or locations which are not tracked by either source control system.
+
+=item B<--dry-run>
+
+Perform everything including copying and deleting files but do not issue any CVS commands.
+
+=item B<--help>
+
+Print the help information
+
+=item B<--man>
+
+Print a man page
+
+=back
+
+=cut
+
+
+
