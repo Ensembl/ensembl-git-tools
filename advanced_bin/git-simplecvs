@@ -35,6 +35,7 @@ use EnsEMBL::Git;
 use Cwd;
 use File::Spec;
 use File::Copy qw/copy/;
+use File::Path;
 
 run();
 
@@ -46,13 +47,15 @@ sub run {
 
   # Get the branch refs and switch
   my ($src, $trg) = map {rev_parse($_, 'short')} ($opts->{commitid}, $opts->{target_commitid});
+  $opts->{short_commitid} = $src;
+  $opts->{short_target_commitid} = $trg;
   print "* Processing changes from $src to $trg into CVS\n";
   print "* Switching git repo to $src\n";
   checkout($src);
 
   # Diff CVS vs. Git src ref (should be the same right)
   my $cvs_branch = $opts->{current_cvs_branch};
-  print "* Checking Git \@ $src agrees with $cvs_branch\n".
+  print "* Checking Git @ $src agrees with $cvs_branch\n";
   diff_git_cvs($opts);
   # Move Git back to the target ref
   checkout($trg);
@@ -67,10 +70,12 @@ sub run {
       if(-f $target) {
         unlink($target) or die "Cannot unlink file ${target}: $!\n";
       }
+      rm_from_cvs($opts, $file);
     }
     elsif($status eq 'A') {
       print "* ADDED    $file\n";
       copy_to_cvs($opts, $file);
+      add_to_cvs($opts, $file);
     }
     elsif($status eq 'M') {
       print "* MODIFIED $file\n";
@@ -79,26 +84,17 @@ sub run {
     else {
       die "Do not understand the status $status";
     }
-  }
-
-  # Diff the repos; post copying they should be in agreement over what has changed
-  print "* Checking Git \@ $trg agrees with new version of $cvs_branch\n".
-  diff_git_cvs($opts);
-
-  # Now that's done loop through and commit the changes
-  foreach my $change (@{$changes}) {
-    my ($status, $file) = @{$change};
-    if($status eq 'D') {
-      print "* DELETED   $file\n";
-      rm_from_cvs($opts, $file);
-    }
-    elsif($status eq 'A') {
-      print "* ADDED     $file\n";
-      add_to_cvs($opts, $file);
-    }
     print "* COMMITTED $file\n";
     commit_cvs($opts, $file);
   }
+
+  print "* Prune empty directories from CVS\n";
+  safe_cwd($opts->{cvs}, sub {
+    system_ok("cvs -q up -P");
+  });
+
+  print "* Switching back to the original branch $trg\n";
+  checkout($opts->{current_git_branch});
 
   print "* DONE\n";
 
@@ -138,6 +134,14 @@ sub sanity_checks {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'Current directory is not a Git repository');
   }
 
+  if(! -d $opts->{cvs}) {
+    pod2usage(-exitval => 2, -verbose => 1, -msg => 'No -cvs directory given');
+  }
+
+  if(! $opts->{commitid}) {
+    pod2usage(-exitval => 2, -verbose => 1, -msg => 'No -commitid given. Need one to base our changes from');
+  }
+
   my $current_cvs_branch = current_cvs_branch($opts);
   $opts->{current_cvs_branch} = $current_cvs_branch;
   my $current_git_branch = current_branch();
@@ -145,6 +149,9 @@ sub sanity_checks {
 
   print "* Current CVS branch is: $current_cvs_branch\n";
   print "* Current Git branch is: $current_git_branch\n";
+  if($current_git_branch eq 'HEAD') {
+    print "***** WARNING. Detatched HEAD state detected. Are you sure you want to continue?\n";
+  }
   if(!prompt()) {
     print STDERR "! Process has been abandoned\n";
   }
@@ -167,7 +174,8 @@ sub git_diff_file_status {
     print STDERR "! Cannot perform a diff between $ref and $target_ref\n";
     exit 4;
   }
-  return [ map { [ split(/\s+/, $_) ] } map { chomp } split(/\n/, $output) ];
+  my @statuses = map { [ split(/\s+/, $_) ] } map { chomp; $_ } split(/\n/, $output);
+  return \@statuses;
 }
 
 # Go to the CVS directory and attempt to find what branch it is on by looking for sticky tags. The lack of
@@ -179,10 +187,10 @@ sub current_cvs_branch {
 
   safe_cwd($opts->{cvs}, sub {  
     my @files = grep { -f $_ } <*>;
-    die 'Cannot find any files in the CVS directory'. $opts->{cvs};
+    die 'Cannot find any files in the CVS directory'. $opts->{cvs} if ! @files;
     foreach my $f (@files) {
       my $base = basename($f);
-      warn "inspecting $base for cvs branch tag";
+      print "* Inspecting $base for cvs branch tag\n";
       #Get the status of the branch
       my ($status, $rc) = cmd(qq{cvs -Q status $base | grep 'Status:'});
       if($rc != 0) {
@@ -221,6 +229,10 @@ sub diff_git_cvs {
   if(!cmd_ok($cmd)) {
     print STDERR "! Cannot continue. CVS and Git diffs do not agree\n";
     print STDERR "! Ran the diff '$cmd'\n";
+    print STDERR "! Differences are:\n";
+    system_ok("diff $exclusions -ru --brief ${cvs} ${git}");
+    print STDERR "! Switched back to the original Git branch\n";
+    checkout($opts->{current_git_branch});
     exit 5;
   }
   return;
@@ -231,6 +243,10 @@ sub copy_to_cvs {
   my ($opts, $file) = @_;
   my $source_file = File::Spec->catdir($opts->{git}, $file);
   my $target_file = File::Spec->catdir($opts->{cvs}, $file);
+  my $target_dir = dirname($target_file);
+  if(! -d $target_dir) {
+    mkdir $target_dir or die "Cannot make the directory $target_dir: $!";
+  }
   copy($source_file, $target_file) or die "Cannot copy $source_file to $target_file.";
   return;
 }
@@ -239,8 +255,9 @@ sub copy_to_cvs {
 sub add_to_cvs {
   my ($opts, $file) = @_;
   return if $opts->{'dry-run'};
+  add_cvs_dir($opts, $file);
   safe_cwd($opts->{cvs}, sub {
-    my $kb_flag = (-B $file) ? '--kb' : q{};
+    my $kb_flag = (-f $file && -B $file) ? '--kb' : q{};
     my ($output, $rc) = cmd("cvs add $kb_flag $file");
     if($rc != 0) {
       # We can get the output "cvs add: `file' already exists, with version number 1.2"
@@ -274,11 +291,23 @@ sub rm_from_cvs {
 # Commit into CVS with a standard message
 sub commit_cvs {
   my ($opts) = @_;
+  return if $opts->{'dry-run'};
   safe_cwd($opts->{cvs}, sub {
-    my ($src, $trg) = map {rev_parse($_, 'short')} ($opts->{commitid}, $opts->{target_commitid});
-    if(!system_ok('cvs commit -m "GIT-SIMPLECVS: Committing the changes accumulated from Git ref $src to $trg. See our Git repository for more information about these changes"')) {
+    my ($src, $trg) = ($opts->{short_commitid}, $opts->{short_target_commitid});
+    if(!system_ok("cvs commit -m 'GIT-SIMPLECVS: Committing the changes accumulated from Git ref $src to $trg. See our Git repository for more information about these changes'")) {
       print STDERR "!Died whilst committing changes to CVS";
       exit 6;
+    }
+  });
+  return;
+}
+
+sub add_cvs_dir {
+  my ($opts, $file) = @_;
+  safe_cwd($opts->{cvs}, sub {
+    my $loc = dirname($file);
+    if(! -d File::Spec->catdir($loc, 'CVS')) {
+      add_to_cvs($opts, $loc);
     }
   });
   return;
