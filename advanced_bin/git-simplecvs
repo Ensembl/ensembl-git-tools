@@ -281,7 +281,7 @@ sub rm_from_cvs {
     }
     my ($output, $rc) = cmd("cvs rm $file");
     if($rc != 0) {
-      print STDERR "!Cannot remove the file $file due to an error: $output";
+      print STDERR "! Cannot remove the file $file due to an error: $output";
       exit 5;
     }
   });
@@ -294,8 +294,9 @@ sub commit_cvs {
   return if $opts->{'dry-run'};
   safe_cwd($opts->{cvs}, sub {
     my ($src, $trg) = ($opts->{short_commitid}, $opts->{short_target_commitid});
-    if(!system_ok("cvs commit -m 'GIT-SIMPLECVS: Committing the changes accumulated from Git ref $src to $trg. See our Git repository for more information about these changes'")) {
-      print STDERR "!Died whilst committing changes to CVS";
+    my ($cvs_branch, $git_branch) = ($opts->{current_cvs_branch}, $opts->{current_git_branch});
+    if(!system_ok("cvs commit -m 'GIT-SIMPLECVS: Committing the changes accumulated from Git ref $src to $trg. Changes applied from Git branch ${git_branch} to CVS branch ${cvs_branch}. See our Git repo for more information about these changes'")) {
+      print STDERR "! Died whilst committing changes to CVS";
       exit 6;
     }
   });
