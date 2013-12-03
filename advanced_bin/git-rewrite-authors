@@ -68,8 +68,8 @@ sub parse_command_line {
 sub sanity_checks {
   my ($opts) = @_;
   my $list = $opts->{list};
-  my $old = $opts->{new};
-  my $new = $opts->{old};
+  my $old = $opts->{old};
+  my $new = $opts->{new};
 
   if(! $list) {
     if(! $old || ! $new) {
