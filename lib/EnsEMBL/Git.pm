@@ -19,6 +19,8 @@ limitations under the License.
 package EnsEMBL::Git;
 
 use parent qw/Exporter/;
+use Carp;
+use Cwd;
 
 our $JSON = 0;
 BEGIN {
@@ -266,6 +268,7 @@ sub cmd_ok {
 # Done to cd to a target dir, run some code and then go back
 sub safe_cwd {
   my ($dir, $callback) = @_;
+  confess "No dir given" unless $dir && -d $dir;
   my $cwd = cwd();
   chdir $dir;
   $callback->();
