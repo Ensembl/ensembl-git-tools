@@ -441,6 +441,34 @@ Configuration is resolved in the following order
 
 When a clashing group is named the higher priority group takes precedence.
 
+=head1 ACTIONS
+
+The script can perform the following actions
+
+=over 8
+
+=item B<list>
+
+Show available groups and the repos it will work with
+
+=item B<clone>
+
+Clone a set of repos
+
+=item B<fetch>
+
+Fetch a new set of changes from origin (GitHub)
+
+=item B<checkout>
+
+Switch branch in all repositories (will fetch from origin first and will create tracking branches where applicable)
+
+=item B<pull>
+
+Fetch remote changes and merge them into the current branch
+
+=back
+
 =head1 OPTIONS
 
 =over 8
