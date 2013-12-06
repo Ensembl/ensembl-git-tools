@@ -24,7 +24,7 @@ use Cwd;
 
 our $JSON = 0;
 eval {
-  use JSON;
+  require JSON;
   $JSON = 1;
 };
 
