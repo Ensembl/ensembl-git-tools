@@ -23,12 +23,10 @@ use Carp;
 use Cwd;
 
 our $JSON = 0;
-BEGIN {
-  eval {
-    require JSON;
-    $JSON = 1;
-  };
-}
+eval {
+  use JSON;
+  $JSON = 1;
+};
 
 our @EXPORT = qw/
   json
@@ -45,7 +43,7 @@ sub json {
   my ($file) = @_;
   return {} unless -f $file;
   if(!$JSON) {
-    printf STDERR "Cannot open '%s' for JSON parsing because we have no JSON module present\n";
+    printf STDERR "Cannot open '%s' for JSON parsing because we have no JSON module present\n", $file;
     return {};
   }
   local $/ = undef;
