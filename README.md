@@ -30,11 +30,17 @@ git ensembl --list
 
 ```
 > git ensembl --list
+[Registered Modules]
+    ensembl (https://github.com/Ensembl/ensembl.git)
+    ensembl-compara (https://github.com/Ensembl/ensembl-compara.git)
+    ensembl-funcgen (https://github.com/Ensembl/ensembl-funcgen.git)
+    ensembl-variation (https://github.com/Ensembl/ensembl-variation.git)
+
 [api] - API module set used for querying and processing Ensembl data
-	ensembl (https://github.com/Ensembl/ensembl.git)
-	ensembl-compara (https://github.com/Ensembl/ensembl-compara.git)
-	ensembl-funcgen (https://github.com/Ensembl/ensembl-funcgen.git)
-	ensembl-variation (https://github.com/Ensembl/ensembl-variation.git)
+	ensembl
+	ensembl-compara
+	ensembl-funcgen
+	ensembl-variation
 ....
 
 > git ensembl clone api
