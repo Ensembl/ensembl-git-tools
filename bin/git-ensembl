@@ -91,7 +91,7 @@ sub parse_command_line {
     email=s
     force_group
     force_module
-    user_cfg=s
+    config|cfg=s
     help|?
     man
   /) or pod2usage(2);
@@ -323,7 +323,7 @@ sub get_groups {
   my $default_groups = _default_groups($opts);
   my $central_cfg = _central_cfg($opts);
   my $user_cfg    = _user_cfg($opts);
-  my $cmd_cfg     = _user_cfg($opts);
+  my $cmd_cfg     = _cmdline_cfg($opts);
   return $opts->{built}->{groups} = {
     %{$default_groups},
     (%{$central_cfg->{groups} || {}}),
@@ -338,7 +338,7 @@ sub get_modules {
   my $default_modules = _default_modules($opts);
   my $central_cfg = _central_cfg($opts);
   my $user_cfg    = _user_cfg($opts);
-  my $cmd_cfg     = _user_cfg($opts);
+  my $cmd_cfg     = _cmdline_cfg($opts);
   return $opts->{built}->{modules} = {
     %{$default_modules},
     (%{$central_cfg->{modules} || {}}),
@@ -367,7 +367,7 @@ sub _central_cfg {
 
 sub _cmdline_cfg {
   my ($opts) = @_;
-  my $file = $opts->{user_cfg};
+  my $file = $opts->{config};
   return {} unless -f $file;
   return json($file);
 }
@@ -434,7 +434,7 @@ git-ensembl - Ensembl-centric Git Utility
 git ensembl [--clone [--name NAME] [--email EMAIL] ] 
             [--checkout --branch BRANCH --secondary_branch BRANCH] 
             [--pull] [--fetch] [--dir DIR] [--groups] [--list] 
-            [--user_cfg CFG_LOCATION]
+            [--config CFG_LOCATION]
             [--force_group] [--force_module]
             [-v] [-h] [-m] GROUPS_OR_MODULES
 
@@ -599,7 +599,7 @@ Perform a pull from origin (Ensembl's remote hosted on GitHub) and all tags
 
 Perform all commands in the given directory
 
-=item B<--user_cfg>
+=item B<--config>
 
 Supply a configuration JSON file and use this as the highest level of configuration.
 
