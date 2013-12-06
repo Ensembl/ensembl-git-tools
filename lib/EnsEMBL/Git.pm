@@ -176,6 +176,7 @@ sub add_config {
 # Convert a ref symbol into a SHA-1 hash
 sub rev_parse {
   my ($rev, $short) = @_;
+  die "No rev given" unless $rev;
   my $short_arg = $short ? '--short' : q{};
   my ($output) = cmd("git rev-parse $short_arg $rev");
   chomp $output;
@@ -194,6 +195,7 @@ sub current_branch {
 # same they will have the same hash
 sub is_origin_uptodate {
   my ($branch) = @_;
+  die "No branch given" unless $branch;
   fetch();
   my $local_hash  = rev_parse($branch);
   my $remote_hash = rev_parse("origin/$branch");
@@ -203,21 +205,43 @@ sub is_origin_uptodate {
 # Attempt to checkout a tracking branch. If the branch already exists locally
 # we will switch to that one (and assume the other branch is tracking)
 sub checkout_tracking {
-  my ($branch, $remote, $verbose) = @_;
+  my ($branch, $remote, $verbose, $secondary_branch) = @_;
+  die "No branch given" unless $branch;
   $remote ||= 'origin';
   
   my $args;
   if(branch_exists($branch)) {
+    if(current_branch() eq $branch) {
+      print "* Skipping checkout as we are already on $branch\n";
+      return 1;
+    }
     $args = $branch;
   }
   else {
     if(! branch_exists($branch, $remote)) {
-      print STDERR "No branch exists on ${remote}/${branch}. Cannot checkout\n";
-      return 0;
+      # If both branch and secondary_branch do not exist then let's bail
+      if(! branch_exists($secondary_branch, $remote)) {
+        print STDERR "No branch exists on ${remote}/${branch} or ${remote}/${secondary_branch}. Cannot checkout\n";
+        return 0;
+      }
+      #If the secondary branch exists just switch to it
+      if(branch_exists($secondary_branch)) {
+        if(current_branch() eq $secondary_branch) {
+          print "* Skipping checkout as we are already on $secondary_branch\n";
+          return 1;
+        }
+        $args = "$secondary_branch";
+      }
+      else {
+        # Well if the branch didn't exist use the secondary
+        $args = "--track -b ${secondary_branch} origin/${secondary_branch}";  
+      }
     }
-    $args = "--track -b ${branch} origin/${branch}";
+    else {
+      # Use the normal branch
+      $args = "--track -b ${branch} origin/${branch}";
+    }
   }
-
   my ($output, $exitcode) = cmd("git checkout $args");
   if($verbose) {
     print $output; 
@@ -235,6 +259,7 @@ sub checkout_tracking {
 
 sub checkout {
   my ($branch, $verbose) = @_;
+  die "No branch given" unless $branch;
   my $v = $verbose ? '--verbose' : q{};
   return cmd_ok("git checkout $v $branch");
 }

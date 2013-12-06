@@ -80,6 +80,7 @@ sub parse_command_line {
     clone
     checkout
     branch=s
+    secondary_branch=s
     pull
     fetch
     dir=s
@@ -146,12 +147,15 @@ sub run_clone {
 sub run_checkout {
   my ($opts, $group) = @_;
   my $branch = $opts->{branch};
+  my $secondary_branch = $opts->{secondary_branch};
   my $verbose = $opts->{verbose};
   _loop_modules_and_chdir($opts, $group, sub {
     print "* Fetching from origin before checking out\n";
     fetch($verbose);
-    print "* Checking out branch '${branch}'\n";
-    if(! checkout_tracking($branch, 'origin', $verbose)) {
+    print "* Checking out branch '${branch}'";
+    print ". Using '${secondary_branch}' as a backup" if $secondary_branch;
+    print "\n";
+    if(! checkout_tracking($branch, 'origin', $verbose, $secondary_branch)) {
       printf STDERR "! Cannot switch to ${branch}\n";
       return 0;
     }
@@ -163,12 +167,13 @@ sub run_checkout {
 sub run_pull {
   my ($opts, $group) = @_;
   my $branch = $opts->{branch};
+  my $secondary_branch = $opts->{secondary_branch};
   my $verbose = $opts->{verbose};
   _loop_modules_and_chdir($opts, $group, sub {
     my ($module) = @_;
     if($branch) {
       print "* Switching branches before initating pull from origin\n";
-      if(! checkout_tracking($branch, 'origin', $verbose)) {
+      if(! checkout_tracking($branch, 'origin', $verbose, $secondary_branch)) {
         printf STDERR "! Cannot switch to ${branch}\n";
         return 0;
       }
@@ -423,7 +428,7 @@ git-ensembl - Ensembl-centric Git Utility
 =head1 SYNOPSIS
 
 git ensembl [--clone [--name NAME] [--email EMAIL] ] 
-            [--checkout --branch BRANCH] 
+            [--checkout --branch BRANCH --secondary_branch BRANCH] 
             [--pull] [--fetch] [--dir DIR] [--groups] [--list] 
             [--user_cfg CFG_LOCATION]
             [--force_group] [--force_module]
@@ -573,6 +578,10 @@ Checkout the branch specified in the B<--branch> command
 =item B<--branch>
 
 Branch to switch to. Used in conjunction with the B<--checkout> and B<--pull> commands
+
+=item B<--secondary_branch>
+
+Branch to switch to if the original branch given in C<--branch> was not found. Used in conjunction with the B<--checkout> and B<--pull> commands
 
 =item B<--fetch>
 
