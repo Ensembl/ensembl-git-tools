@@ -34,8 +34,8 @@ use Getopt::Long;
 use Cwd;
 use EnsEMBL::Git;
 
-# This normally lives in ~ensembl/git-ensembl.groups or ~/git-ensembl.groups
-my $CFG_FILE = 'git-ensembl.groups';
+# This normally lives in ~ensembl/git-ensembl.cfg or ~/git-ensembl.cfg
+my $CFG_FILE = 'git-ensembl.cfg';
 # All default ensembl repos have this public root
 my $GITHUB_HTTPS_ROOT = 'https://github.com/Ensembl/';
 my $GITHUB_SSH_ROOT = 'ssh://git@github.com/Ensembl/';
@@ -49,6 +49,7 @@ sub run {
     exit 0;
   }
 
+  verify_groups($opts);
   chdir $opts->{dir};
   foreach my $grp (@{$opts->{groups}}) {
     if($opts->{clone}) {
@@ -87,6 +88,9 @@ sub parse_command_line {
     ssh
     name=s
     email=s
+    force_group
+    force_module
+    user_cfg=s
     help|?
     man
   /) or pod2usage(2);
@@ -103,6 +107,7 @@ sub parse_command_line {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'No groups specified; please specify some');
   }
   $opts->{groups} = [map { lc($_) } @ARGV];
+
   return $opts;
 }
 
@@ -192,11 +197,18 @@ sub run_fetch {
 
 sub run_list {
   my ($opts) = @_;
+  my $modules = get_modules($opts);
+  print "[Registered Modules]\n";
+  foreach my $module (sort keys %{$modules}) {
+    printf("\t%s (%s)\n", $module, $modules->{$module});
+  }
+  print "\n";
+
   my $all_groups = get_groups($opts);
-  foreach my $group (sort keys %$all_groups) {
+  foreach my $group (sort keys %{$all_groups}) {
     my $definitions = $all_groups->{$group};
     printf("[%s] - %s\n", $group, $definitions->{desc});
-    printf("\t%s (%s)\n", $_, $definitions->{modules}->{$_}) for sort keys %{$definitions->{modules}};
+    printf("\t%s\n", $_) for sort @{$definitions->{modules}};
     print "\n";
   }
   return;
@@ -226,54 +238,108 @@ sub _loop_modules_and_chdir {
 # the callback to process the name and it's remote URL
 sub _loop_modules {
   my ($opts, $group, $callback) = @_;
-  printf "* Processing group '%s'\n\n", $group;
-  my $modules = get_modules($opts, $group);
-  if(! keys %{$modules}) {
+  printf "* Processing '%s'\n", $group;
+  my $modules_lookup = get_modules($opts);
+  my $modules = group_to_modules($opts, $group);
+  if(! @{$modules}) {
     print "* Cannot find any modules. Check that this group was active using --list\n";
     return;
   }
 
-  foreach my $module (sort keys %{$modules}) {
+  foreach my $module (sort @{$modules}) {
+    if($opts->{seen_modules}->{$module}) {
+      printf "* Skipping '%s' as we have already processed it\n", $module;
+      next;
+    }
     printf "* Working with '%s'\n", $module;
-    my $remote = $modules->{$module};
+    my $remote = $modules_lookup->{$module};
     $callback->($module, $remote);
-    print "\n";
+    $opts->{seen_modules}->{$module} = 1;
   }
+  print "\n";
+
   return;
 }
 
 # Loop through the remainder
 sub verify_groups {
   my ($opts) = @_;
+  my $modules = get_modules($opts);
   my $groups = get_groups($opts);
   foreach my $group (@{$opts->{groups}}) {
-    if(! exists $groups->{$group}) {
-      pod2usage(-exitval => 1, -verbose => 1, -msg => "We do not understand the group '${group}'. Please use the --list command to see all available groups");
+    if($opts->{force_module}) {
+      if(! exists $modules->{$group}) {
+        pod2usage(-exitval => 1, -verbose => 0, -msg => "--force_module is on. We do not understand the module '${group}'. Please use the --list command to see all available groups and modules");
+      }
+    }
+    elsif($opts->{force_group}) {
+      if(! exists $groups->{$group}) {
+        pod2usage(-exitval => 1, -verbose => 0, -msg => "--force_group is on. We do not understand the group '${group}'. Please use the --list command to see all available groups and modules");
+      }
+    }
+    else {
+      if(! exists $groups->{$group} && ! exists $modules->{$group}) {
+        pod2usage(-exitval => 1, -verbose => 0, -msg => "We do not understand the group or module '${group}'. Please use the --list command to see all available groups and modules");
+      }
     }
   }
   return 1;
 }
 
-sub get_modules {
+sub group_to_modules {
   my ($opts, $group) = @_;
-  my $all_groups = get_groups($opts);
-  return $all_groups->{$group}->{modules};
+  my $modules = get_modules($opts);
+  my $groups = get_groups($opts);
+  if($opts->{force_group}) {
+    return $groups->{$group}->{modules};  
+  }
+  elsif($opts->{force_module}) {
+    return [$group] if exits $modules->{$group};
+  }
+  else {
+    if(exists $modules->{$group}) {
+      return [$group];
+    }
+    elsif(exists $groups->{$group}) {
+      #Otherwise return the group. We know it's OK because of verify_groups()
+      return $groups->{$group}->{modules};  
+    }
+  }
+  return {};
 }
 
 sub get_groups {
   my ($opts) = @_;
-  my $default = _default_groups($opts);
-  my $central = _central_groups($opts);
-  my $user    = _user_groups($opts);
-  return {
-    %{$default},
-    %{$central},
-    %{$user},
+  return $opts->{built}->{groups} if exists $opts->{built}->{groups};
+  my $default_groups = _default_groups($opts);
+  my $central_cfg = _central_cfg($opts);
+  my $user_cfg    = _user_cfg($opts);
+  my $cmd_cfg     = _user_cfg($opts);
+  return $opts->{built}->{groups} = {
+    %{$default_groups},
+    (%{$central_cfg->{groups} || {}}),
+    (%{$user_cfg->{groups} || {}}),
+    (%{$cmd_cfg->{groups} || {}}),
   };
 }
 
+sub get_modules {
+  my ($opts) = @_;
+  return $opts->{built}->{modules} if exists $opts->{built}->{modules};
+  my $default_modules = _default_modules($opts);
+  my $central_cfg = _central_cfg($opts);
+  my $user_cfg    = _user_cfg($opts);
+  my $cmd_cfg     = _user_cfg($opts);
+  return $opts->{built}->{modules} = {
+    %{$default_modules},
+    (%{$central_cfg->{modules} || {}}),
+    (%{$user_cfg->{modules} || {}}),
+    (%{$cmd_cfg->{modules} || {}}),
+  }; 
+}
+
 # Grab the user groups from $HOME/$CFG_FILE
-sub _user_groups {
+sub _user_cfg {
   my ($opts) = @_;
   my $my_home = (getpwuid($<))[7];
   my $file = File::Spec->catfile($my_home, $CFG_FILE);
@@ -282,7 +348,7 @@ sub _user_groups {
 }
 
 # Grab the central groups from $ENSHOME/$CFG_FILE
-sub _central_groups {
+sub _central_cfg {
   my ($opts) = @_;
   my $ens_home = (getpwnam('ensembl'))[7];
   my $file = File::Spec->catfile($ens_home, $CFG_FILE);
@@ -290,67 +356,62 @@ sub _central_groups {
   return json($file);
 }
 
+sub _cmdline_cfg {
+  my ($opts) = @_;
+  my $file = $opts->{user_cfg};
+  return {} unless -f $file;
+  return json($file);
+}
+
+# Provide the default repos
+sub _default_modules {
+  my ($opts) = @_;
+  my $root = ($opts->{ssh}) ? $GITHUB_SSH_ROOT : $GITHUB_HTTPS_ROOT;
+  return {
+    'ensembl'             => $root.'ensembl.git',
+    'ensembl-compara'     => $root.'ensembl-compara.git',
+    'ensembl-variation'   => $root.'ensembl-variation.git',
+    'ensembl-funcgen'     => $root.'ensembl-funcgen.git',
+    'ensembl-tools'       => $root.'ensembl-tools.git',
+    'ensembl-production'  => $root.'ensembl-production.git',
+    'ensembl-rest'        => $root.'ensembl-rest.git',
+    'ensembl-webcode'     => $root.'ensembl-webcode.git',
+    'ensembl-draw'        => $root.'ensembl-draw.git',
+    'ensembl-orm'         => $root.'ensembl-orm.git',
+    'public-plugins'      => $root.'public-plugins.git',
+  }
+}
+
 # Provide the default groups
 sub _default_groups {
   my ($opts) = @_;
-
-  my $root = ($opts->{ssh}) ? $GITHUB_SSH_ROOT : $GITHUB_HTTPS_ROOT;
-
-  my $core_api_modules = {
-    'ensembl'           => $root.'ensembl.git',
-    'ensembl-compara'   => $root.'ensembl-compara.git',
-    'ensembl-variation' => $root.'ensembl-variation.git',
-    'ensembl-funcgen'   => $root.'ensembl-funcgen.git',
-  };
-
   return {
     temp => {
       desc => 'Temporary group reflecting currently available github based repos',
-      modules => {
-        'ensembl'           => $root.'ensembl.git',
-        'ensembl-compara'   => $root.'ensembl-compara.git',
-      }
+      modules => [qw/ensembl ensembl-compara/],
     },
     api => {
       desc => 'API module set used for querying and processing Ensembl data',
-      modules => $core_api_modules,
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen/],
     },
     tools => {
       desc => 'Libraries required to run Ensembl tools such as the VEP',
-      modules => {
-        %{$core_api_modules},
-        'ensembl-tools' => $root.'ensembl-tools.git'
-      },
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-tools/],
     },
     production => {
       desc => 'Libraries required to run Ensembl production',
-      modules => {
-        %{$core_api_modules},
-        'ensembl-production' => $root.'ensembl-production.git',
-        'ensembl-orm' => $root.'ensembl-orm.git',
-      },
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-production ensembl-orm/],
     },
     rest => {
       desc => 'Libraries required to run the Ensembl REST API',
-      modules => {
-        %{$core_api_modules},
-        'ensembl-rest' => $root.'ensembl-rest.git',
-      },
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-rest/],
     },
     web => {
       desc => 'Libraries required to run the Ensembl website',
-      modules => {
-        %{$core_api_modules},
-        'ensembl-webcode' => $root.'ensembl-webcode.git',
-        'ensembl-draw' => $root.'ensembl-draw.git',
-        'ensembl-orm' => $root.'ensembl-orm.git',
-        'public-plugins' => $root.'public-plugins.git',
-      },
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode ensembl-draw public-plugins/],
     }
   };
 }
-
-
 
 __END__
 =pod
@@ -364,7 +425,9 @@ git-ensembl - Ensembl-centric Git Utility
 git ensembl [--clone [--name NAME] [--email EMAIL] ] 
             [--checkout --branch BRANCH] 
             [--pull] [--fetch] [--dir DIR] [--groups] [--list] 
-            [-v] [-h] [-m] GROUPS
+            [--user_cfg CFG_LOCATION]
+            [--force_group] [--force_module]
+            [-v] [-h] [-m] GROUPS_OR_MODULES
 
 # List all available groups
 
@@ -394,6 +457,9 @@ git ensembl --pull --branch master api
 
 git ensembl --checkout --branch global/branch api
 
+# Clone the api group and the ensembl-test repository
+git ensembl --clone api ensembl-test
+
 =head1 DESCRIPTION
 
 Provides a number of convienience actions used to clone, switch branches & pull in new changes from remote Ensembl repositories. It also provides a way of addressing multiple repositories by a group name and applying the previously mentioned functions over those groups.
@@ -404,13 +470,16 @@ B<If you are making a read/write clone make sure you specify your username via t
 
 =head1 SCRIPT CONFIGURATION
 
-This script ships with a number of default configurations. You can add to these if they are in the default global location C<~ensembl/git-ensembl.groups> or your home directory at C<~/git-ensembl.groups>. The format is a permissive JSON file (accepting comments and tollerant to formatting/trailing punctuation) like so:
+This script ships with a number of default configurations. You can add to these if they are in the default global location C<~ensembl/git-ensembl.cfg> or your home directory at C<~/git-ensembl.cfg>. The format is a permissive JSON file (accepting comments and tollerant to formatting/trailing punctuation) like so:
 
     {
-      "groupname" : {
-        "desc" : "Group description",
-        "modules" : {
-          "module" : "giturl",
+      "modules" : {
+        "module" : "https://github.com/module.git"
+      },
+      "groups" : {
+        "groupname" : {
+          "desc" : "Group description",
+          "modules" : ["module"]
         }
       }
     }
@@ -418,11 +487,13 @@ This script ships with a number of default configurations. You can add to these 
 For example:
 
     {
-      "coretests" : {
-        "desc" : "All the modules you need to get core modules working",
-        "modules" : {
-          "ensembl" : "https://github.com/Ensembl/ensembl.git",
-          "ensembl-test" : "https://github.com/Ensembl/ensembl-test.git",
+      "modules" : {
+        "module" : "https://github.com/module.git"
+      },
+      "groups" : {
+        "coretests" : {
+          "desc" : "All the modules you need to get core modules working",
+          "modules" : ["ensembl", "ensembl-test"]
         }
       }
     }
@@ -430,6 +501,8 @@ For example:
 Configuration is resolved in the following order
 
 =over 8
+
+=item * Command line configuration
 
 =item * User configuration
 
@@ -512,6 +585,18 @@ Perform a pull from origin (Ensembl's remote hosted on GitHub) and all tags
 =item B<--dir>
 
 Perform all commands in the given directory
+
+=item B<--user_cfg>
+
+Supply some user configuration
+
+=item B<--force_group>
+
+Force the interpritation of all additional arguments as groups not as modules
+
+=item B<--force_module>
+
+Force the interpritation of all additional arguments as modules not as groups
 
 =item B<--list>
 
