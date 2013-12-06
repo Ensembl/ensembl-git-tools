@@ -258,6 +258,10 @@ sub _loop_modules {
     }
     printf "* Working with '%s'\n", $module;
     my $remote = $modules_lookup->{$module};
+    if(!$remote) {
+      printf "* Skipping '%s' as we had no remote URL linked to it. Check your config\n", $module;
+      next;
+    }
     $callback->($module, $remote);
     $opts->{seen_modules}->{$module} = 1;
   }
@@ -266,7 +270,7 @@ sub _loop_modules {
   return;
 }
 
-# Loop through the remainder
+# Loop through the groups and decide if we have config linked to them
 sub verify_groups {
   my ($opts) = @_;
   my $modules = get_modules($opts);
