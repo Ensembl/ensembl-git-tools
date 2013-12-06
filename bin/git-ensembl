@@ -597,7 +597,7 @@ Perform all commands in the given directory
 
 =item B<--user_cfg>
 
-Supply some user configuration
+Supply a configuration JSON file and use this as the highest level of configuration.
 
 =item B<--force_group>
 

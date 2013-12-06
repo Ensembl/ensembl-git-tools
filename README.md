@@ -58,7 +58,7 @@ Groups can be found using the `--list` command which reports all available group
 
 #### Configuration
 
-The `git-ensembl` command can be supplemented with user and global configuration allowing you to define new groups or override existing groups with new definitions. That configuration must be called `git-ensembl.groups` and can be located in `$HOME` or `~ensembl`. User based configuration will always win.
+The `git-ensembl` command can be supplemented with user and global configuration allowing you to define new groups and modules or override existing groups and modules with new definitions. That configuration must be called `git-ensembl.cfg` and can be located in `$HOME` or `~ensembl`. User based configuration will always win. You can also specify a config on the command line.
 
 ### git-mgw
 
