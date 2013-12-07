@@ -351,24 +351,27 @@ sub get_modules {
 sub _user_cfg {
   my ($opts) = @_;
   my $my_home = (getpwuid($<))[7];
-  my $file = File::Spec->catfile($my_home, $CFG_FILE);
-  return {} unless -f $file;
-  return json($file);
+  return _json(File::Spec->catfile($my_home, $CFG_FILE));
 }
 
 # Grab the central groups from $ENSHOME/$CFG_FILE
 sub _central_cfg {
   my ($opts) = @_;
   my $ens_home = (getpwnam('ensembl'))[7];
-  my $file = File::Spec->catfile($ens_home, $CFG_FILE);
-  return {} unless -f $file;
-  return json($file);
+  return _json(File::Spec->catfile($ens_home, $CFG_FILE));
 }
 
+# Read config from the command line
 sub _cmdline_cfg {
   my ($opts) = @_;
-  my $file = $opts->{config};
-  return {} unless -f $file;
+  return _json($opts->{config});
+}
+
+# Load a JSON file. Also do error checking for file existence
+sub _json {
+  my ($file) = @_;
+  return {} if ! $file;
+  return {} if ! -f $file;
   return json($file);
 }
 
