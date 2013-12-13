@@ -420,7 +420,7 @@ sub _default_groups {
     },
     web => {
       desc => 'Libraries required to run the Ensembl website',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode ensembl-draw public-plugins/],
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode ensembl-draw public-plugins ensembl-orm ensembl-tools/],
     }
   };
 }
