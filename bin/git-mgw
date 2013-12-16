@@ -18,9 +18,10 @@ use strict;
 use warnings;
 
 BEGIN {
+  use Cwd;
   use File::Basename;
   use File::Spec;
-  my $dirname = dirname(__FILE__);
+  my $dirname = dirname(Cwd::realpath(__FILE__));
   my $lib = File::Spec->catdir($dirname, File::Spec->updir(), 'lib');
   if(-d $lib) {
     unshift(@INC, $lib);
