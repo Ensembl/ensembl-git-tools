@@ -46,11 +46,12 @@ sub run {
   my $trg = $opts->{target};
   my $merge = $opts->{merge};
   my $rebase = $opts->{rebase};
+  my $remote = $opts->{remote};
 
   # Checkout target and get latest changes
   checkout($trg);
-  if(! pull('origin', 'verbose')) {
-    print STDERR "! Could not perform pull from origin. Aborting\n";
+  if(! pull($remote, 'verbose')) {
+    print STDERR "! Could not perform pull from $remote. Aborting\n";
     exit 3;
   }
 
@@ -82,8 +83,8 @@ sub run {
 
   # Now back to 'master' and merge if remote and local are in sync
   checkout($trg);
-  print "* Checking that $trg is at the same revision as origin/$trg\n";
-  if(!is_origin_uptodate($trg)) {
+  print "* Checking that $trg is at the same revision as $remote/$trg\n";
+  if(!is_origin_uptodate($trg, $remote)) {
     print STDERR "! Local and remote branches are not on the same hash. Cannot continue\n";
     exit 7;
   }
@@ -114,17 +115,17 @@ sub run {
     print "* Leaving changes on $trg and not pushing\n";
   }
   else {
-    print "* About to push to origin\n";
+    print "* About to push to $remote\n";
     if(! $opts->{noprompt} && ! prompt()) {
       print STDERR "! Abandoned changes\n";
       exit 9;
     }
 
-   if(!git_push('origin', 'verbose')) {
-      print STDERR "! Could not push back to origin. WARNING ON STILL ON '${trg}'\n";
+   if(!git_push($remote, 'verbose')) {
+      print STDERR "! Could not push back to $remote. WARNING ON STILL ON '${trg}'\n";
       exit 10;
     }
-    print "* Finished and pushed changes to origin\n";
+    print "* Finished and pushed changes to $remote\n";
   }
 
   print "* Switching back to $src\n";
@@ -139,6 +140,7 @@ sub parse_command_line {
   my $opts = {
     source => 'dev',
     target => 'master',
+    remote => 'origin',
     nopush => 0,
     noprompt => 0,
     merge => 0,
@@ -150,6 +152,7 @@ sub parse_command_line {
   GetOptions($opts, qw/
     source=s
     target=s
+    remote=s
     nopush!
     noprompt!
     merge
@@ -174,6 +177,7 @@ sub sanity_checks {
   my ($opts) = @_;
   my $src = $opts->{source};
   my $trg = $opts->{target};
+  my $rem = $opts->{remote};
 
   if(! $opts->{merge} && ! $opts->{rebase}) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'You need to specify the --rebase or --merge strategy');
@@ -208,6 +212,7 @@ sub sanity_checks {
   printf  "* MGW strategy is '%s'\n", ( $opts->{merge} ? 'merge' : 'rebase');
   print   "* Source branch is '$src'\n";
   print   "* Target branch is '$trg'\n";
+  print   "* Remote name is '$rem'\n";
   if(! $opts->{noprompt} && ! prompt()) {
     print STDERR "! Aborting on user request\n";
     exit 2;
@@ -225,7 +230,7 @@ git-mgw - Perform the Minimal Git Workflow
 
 =head1 SYNOPSIS
 
-git mgw [--rebase | --merge] [-source BRANCH] [-target BRANCH] [-nopush] [-noprompt] [-h] [-m]
+git mgw [--rebase | --merge] [-source BRANCH] [-target BRANCH] [-remote ORIGIN] [-nopush] [-noprompt] [-h] [-m]
 
 =head1 DESCRIPTION
 
@@ -257,6 +262,10 @@ The source branch of changes. Defaults to dev. Cannot be a remote tracking branc
 =item B<--target>
 
 The target branch of the changes. Defaults to master.
+
+=item B<--remote>
+
+The name of the remote. Defaults to origin.
 
 =item B<--nopush>
 

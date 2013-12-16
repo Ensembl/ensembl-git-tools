@@ -95,9 +95,9 @@ sub is_tree_clean {
 
 # Perform a clone. Local dir will have the same name as the remote minus the organisation and .git stuff
 sub clone {
-  my ($remote, $verbose) = @_;
+  my ($remote_url, $verbose, $remote) = @_;
   my $v = $verbose ? '--verbose' : q{};
-  return system_ok("git clone $v $remote");
+  return system_ok("git clone -o $remote $v $remote_url");
 }
 
 # Attempt to find the given branch locally by looking for its ref. If no ref is found then we have no branch
@@ -131,10 +131,11 @@ sub git_push {
 
 # Runs a fetch on origin but unlike pull will not do the merge
 sub fetch {
-  my ($fetch_tags, $verbose) = @_;
+  my ($fetch_tags, $verbose, $remote) = @_;
   my $v = $verbose ? '--verbose' : q{};
   my $tags = ($fetch_tags) ? '--tags' : q{};
-  return system_ok("git fetch $v $tags origin");
+  $remote ||= 'origin';
+  return system_ok("git fetch $v $tags $remote");
 }
 
 # Rebases against the given branch
@@ -194,11 +195,12 @@ sub current_branch {
 # We request both refs SHA-1 codes and compare. If they are the 
 # same they will have the same hash
 sub is_origin_uptodate {
-  my ($branch) = @_;
+  my ($branch, $remote) = @_;
   die "No branch given" unless $branch;
-  fetch();
+  $remote ||= 'origin';
+  fetch(undef, undef, $remote);
   my $local_hash  = rev_parse($branch);
-  my $remote_hash = rev_parse("origin/$branch");
+  my $remote_hash = rev_parse("$remote/$branch");
   return ($local_hash eq $remote_hash) ? 1 : 0;
 }
 
@@ -234,12 +236,12 @@ sub checkout_tracking {
       }
       else {
         # Well if the branch didn't exist use the secondary
-        $args = "--track -b ${secondary_branch} origin/${secondary_branch}";  
+        $args = "--track -b ${secondary_branch} $remote/${secondary_branch}";
       }
     }
     else {
       # Use the normal branch
-      $args = "--track -b ${branch} origin/${branch}";
+      $args = "--track -b ${branch} $remote/${branch}";
     }
   }
   my ($output, $exitcode) = cmd("git checkout $args");

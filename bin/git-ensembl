@@ -72,6 +72,7 @@ sub run {
 sub parse_command_line {
   my $opts = {
     dir => cwd(),
+    remote => 'origin',
     verbose => 1,
     help => 0,
     man => 0
@@ -82,6 +83,7 @@ sub parse_command_line {
     checkout
     branch=s
     secondary_branch=s
+    remote=s
     pull
     fetch
     dir=s
@@ -117,15 +119,15 @@ sub run_clone {
   my ($opts, $group) = @_;
 
   _loop_modules($opts, $group, sub {
-    my ($module, $remote) = @_;
+    my ($module, $remote_url) = @_;
 
     if ( -d $module) {
       print STDERR "! Skipping module as there is already a directory called that; try 'git ensembl --pull'\n";
       return;
     }
 
-    print "* Cloning from remote '${remote}'\n";
-    if(! clone($remote, $opts->{verbose})) {
+    print "* Cloning from remote '${remote_url}'\n";
+    if(! clone($remote_url, $opts->{verbose}, $opts->{remote})) {
       print STDERR "! Failed to clone the module '$module'\n";
       return;
     }
@@ -150,13 +152,14 @@ sub run_checkout {
   my $branch = $opts->{branch};
   my $secondary_branch = $opts->{secondary_branch};
   my $verbose = $opts->{verbose};
+  my $remote = $opts->{remote};
   _loop_modules_and_chdir($opts, $group, sub {
     print "* Fetching from origin before checking out\n";
     fetch($verbose);
     print "* Checking out branch '${branch}'";
     print ". Using '${secondary_branch}' as a backup" if $secondary_branch;
     print "\n";
-    if(! checkout_tracking($branch, 'origin', $verbose, $secondary_branch)) {
+    if(! checkout_tracking($branch, $remote, $verbose, $secondary_branch)) {
       printf STDERR "! Cannot switch to ${branch}\n";
       return 0;
     }
@@ -170,18 +173,19 @@ sub run_pull {
   my $branch = $opts->{branch};
   my $secondary_branch = $opts->{secondary_branch};
   my $verbose = $opts->{verbose};
+  my $remote = $opts->{remote};
   _loop_modules_and_chdir($opts, $group, sub {
     my ($module) = @_;
     if($branch) {
       print "* Switching branches before initating pull from origin\n";
-      if(! checkout_tracking($branch, 'origin', $verbose, $secondary_branch)) {
+      if(! checkout_tracking($branch, $remote, $verbose, $secondary_branch)) {
         printf STDERR "! Cannot switch to ${branch}\n";
         return 0;
       }
     }
 
     print "* Performing pull\n";
-    pull('origin', $verbose);
+    pull($remote, $verbose);
     fetch('tags', $verbose);
 
     return;
@@ -437,7 +441,7 @@ git-ensembl - Ensembl-centric Git Utility
 
 git ensembl [--clone [--name NAME] [--email EMAIL] ] 
             [--checkout --branch BRANCH --secondary_branch BRANCH] 
-            [--pull] [--fetch] [--dir DIR] [--groups] [--list] 
+            [--pull] [--fetch] [--remote ORIGIN] [--dir DIR] [--groups] [--list]
             [--config CFG_LOCATION]
             [--force_group] [--force_module]
             [-v] [-h] [-m] GROUPS_OR_MODULES
@@ -598,6 +602,10 @@ Fetch changes from origin and also fetch any tags
 =item B<--pull>
 
 Perform a pull from origin (Ensembl's remote hosted on GitHub) and all tags
+
+=item B<--remote>
+
+Name of the remote. Defaults to origin.
 
 =item B<--dir>
 
