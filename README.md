@@ -43,7 +43,7 @@ git ensembl --list
 	ensembl-variation
 ....
 
-> git ensembl clone api
+> git ensembl --clone api
 ... wait a bit ...
 ```
 
