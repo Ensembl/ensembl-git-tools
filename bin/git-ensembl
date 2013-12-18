@@ -475,6 +475,7 @@ git ensembl --pull --branch master api
 git ensembl --checkout --branch global/branch api
 
 # Clone the api group and the ensembl-test repository
+
 git ensembl --clone api ensembl-test
 
 =head1 DESCRIPTION
