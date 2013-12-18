@@ -106,7 +106,7 @@ TMPL
 
 sub _separate_identity {
   my ($identity) = @_;
-  my ($name, $email) = $identity =~ /([A-Za-z\(\)\. ]+)\s+<(.*)>/xms;
+  my ($name, $email) = $identity =~ /([A-Za-z0-9_\-\(\)\. ]+)\s+<(.*)>/xms;
   return ($name, $email);
 }
 
