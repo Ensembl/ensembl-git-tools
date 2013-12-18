@@ -403,10 +403,6 @@ sub _default_modules {
 sub _default_groups {
   my ($opts) = @_;
   return {
-    temp => {
-      desc => 'Temporary group reflecting currently available github based repos',
-      modules => [qw/ensembl ensembl-compara/],
-    },
     api => {
       desc => 'API module set used for querying and processing Ensembl data',
       modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen/],
