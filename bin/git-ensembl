@@ -329,12 +329,23 @@ sub get_groups {
   my $central_cfg = _central_cfg($opts);
   my $user_cfg    = _user_cfg($opts);
   my $cmd_cfg     = _cmdline_cfg($opts);
-  return $opts->{built}->{groups} = {
+  
+  my $groups = {
     %{$default_groups},
     (%{$central_cfg->{groups} || {}}),
     (%{$user_cfg->{groups} || {}}),
     (%{$cmd_cfg->{groups} || {}}),
   };
+  
+  if(! exists $groups->{all}) {
+    my $modules = get_modules($opts);
+    $groups->{all} = {
+      desc => 'An auto-genreated group pointing at all modules known to the script. Use this to apply commands to all repositories',
+      modules => [keys %{$modules}],
+    };
+  }
+  
+  return $opts->{built}->{groups} = $groups;
 }
 
 sub get_modules {
