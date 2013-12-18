@@ -448,6 +448,7 @@ sub _default_modules {
     'ensembl-doc'         => $root.'ensembl-doc.git',
     'ensembl-xs'          => $root.'ensembl-xs.git',
     'ensembl-internal-variation'   => $root.'ensembl-internal-variation.git',
+    'ensembl-test'        => $root.'ensembl-test.git',
   }
 }
 
