@@ -407,6 +407,15 @@ sub _default_modules {
     'ensembl-draw'        => $root.'ensembl-draw.git',
     'ensembl-orm'         => $root.'ensembl-orm.git',
     'public-plugins'      => $root.'public-plugins.git',
+    'ensembl-hive'        => $root.'ensembl-hive.git',
+    'ensembl-analysis'    => $root.'ensembl-analysis.git',
+    'ensembl-pipeline'    => $root.'ensembl-pipeline.git',
+    'ensembl-test'        => $root.'ensembl-test.git',
+    'ensj-healthcheck'    => $root.'ensj-healthcheck.git',
+    'WiggleTools'         => $root.'WiggleTools.git',
+    'ensembl-doc'         => $root.'ensembl-doc.git',
+    'ensembl-xs'          => $root.'ensembl-xs.git',
+    'ensembl-internal-variation'   => $root.'ensembl-internal-variation.git',
   }
 }
 
