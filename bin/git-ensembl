@@ -65,6 +65,9 @@ sub run {
     elsif($opts->{fetch}) {
       run_fetch($opts, $grp);
     }
+    elsif($opts->{status}) {
+      run_status($opts, $grp);
+    }
   }
   exit 0;
 }
@@ -86,6 +89,7 @@ sub parse_command_line {
     remote=s
     pull
     fetch
+    status
     dir=s
     groups
     list
@@ -221,6 +225,15 @@ sub run_list {
     printf("\t%s\n", $_) for sort @{$definitions->{modules}};
     print "\n";
   }
+  return;
+}
+
+sub run_status {
+  my ($opts, $group) = @_;
+  _loop_modules_and_chdir($opts, $group, sub {
+    status();
+    return;
+  });
   return;
 }
 

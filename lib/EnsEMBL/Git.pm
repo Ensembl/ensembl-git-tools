@@ -32,6 +32,7 @@ our @EXPORT = qw/
   json
   is_git_repo is_tree_clean is_origin_uptodate
   clone checkout checkout_tracking pull fetch rebase ff_merge no_ff_merge git_push
+  status
   rev_parse branch_exists current_branch
   get_config add_config unset_all_config
   prompt
@@ -152,6 +153,10 @@ sub ff_merge {
 sub no_ff_merge($$) {
   my ($branch, $message) = @_;
   return system_ok(qq/git merge --no-ff --log -m '$message' ${branch}/);
+}
+
+sub status {
+  return system_ok('git status');
 }
 
 # Get a config value out
