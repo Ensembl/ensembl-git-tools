@@ -1,0 +1,185 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+use Pod::Usage;
+use Getopt::Long;
+use JSON;
+use HTTP::Tiny;
+
+my $base_url = 'https://api.github.com';
+my $http = HTTP::Tiny->new();
+
+run();
+
+sub run {
+  my $opts = parse_command_line();
+  my $repos = get_repos($opts);
+  foreach my $repo (@{$repos}) {
+    print "* Working with $repo\n";
+    if(! has_branch($opts, $repo)) {
+      print "*   Branch was not found. Skipping\n";
+      next;
+    }
+    if(default_branch($opts, $repo)) {
+      print "*   Branch is already the active default_branch\n";
+    }
+    else {
+      print "*   Branch is there. Switching\n";
+      update_branch($opts, $repo);
+    }
+    print "*   Finished with repo ${repo}\n";
+  }
+  return;
+}
+
+sub get_repos {
+  my ($opts) = @_;
+  if(@{$opts->{repository}}) {
+    print "* Using user submitted repositories\n";
+    return $opts->{repository};
+  }
+  print "* Fetching all public repositories from GitHub\n";
+  my $json = get_json($opts, '/orgs/Ensembl/repos?type=public', 'GET');
+  return [ sort map { $_->{name} } @{$json} ];
+}
+
+sub default_branch {
+  my ($opts, $repo) = @_;
+  my $branch = $opts->{branch};
+  print "*   Checking for default_branch against user branch $branch\n";
+  my $json = get_json($opts, "/repos/Ensembl/${repo}", 'GET');
+  return 1 if $json->{default_branch} eq $branch;
+  return 0;
+}
+
+sub has_branch {
+  my ($opts, $repo) = @_;
+  my $branch = $opts->{branch};
+  print "*   Checking if $repo has branch $branch\n";
+  my $json = get_json($opts, "/repos/Ensembl/${repo}/branches", 'GET');
+  foreach my $branch_spec (@{$json}) {
+    if($branch_spec->{name} eq $branch) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+sub update_branch {
+  my ($opts, $repo) = @_;
+  if($opts->{'dry-run'}) {
+    print "*   Skipping the update as we are in --dry-run\n";
+    return;
+  }
+  
+  my $branch = $opts->{branch};
+  print "*   Updating $repo to branch $branch\n";
+  my $response = $http->request('PATCH', "$base_url/repos/Ensembl/${repo}", {
+    headers => { Authorization => 'token '.$opts->{oauth}},
+    content => encode_json({name => $repo, default_branch => $branch}),
+  });
+  die "Failed to update (/repos/Ensembl/${repo})! STATUS: $response->{status} REASON: $response->{reason}\n" unless $response->{success};
+  print "*   Done\n";
+  return;
+}
+
+sub get_json {
+  my ($opts, $url, $method) = @_;
+  my $options = { headers => { } };
+  $options->{headers}->{Authorization} = 'token '.$opts->{oauth} if $opts->{oauth};
+  my $response = $http->request($method, $base_url.$url, $options);
+  die "Failed to fetch (${url})! STATUS: $response->{status} REASON: $response->{reason}\n" unless $response->{success};
+  return decode_json($response->{content});
+}
+
+sub parse_command_line {
+  my $opts = {
+    repository => [],
+    help => 0,
+    man => 0
+  };
+
+  GetOptions($opts, qw/
+    repository|repo=s@
+    oauth=s
+    branch=s
+    dry-run
+    help|?
+    man
+  /) or pod2usage(2);
+
+  pod2usage(1) if $opts->{help};
+  pod2usage(-exitval => 0, -verbose => 2) if $opts->{man};
+
+  if(!$opts->{oauth}) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => 'You must specify a --oauth token');
+  }
+  if(!$opts->{branch}) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => 'You must specify a --branch to switch to');
+  }
+
+  return $opts;
+}
+
+__END__
+=pod
+
+=head1 NAME
+
+github-switchbranch - A tool for switching default branches in GitHub
+
+=head1 SYNOPSIS
+
+github-switchbranch --oauth OAUTH --branch BRANCH [--repository REPO] [--dry-run] [-h] [-m]
+
+# Switch default branch in all repos
+
+github-switchbranch --oauth XXXXXXXXXXXXXXXXXXXXXX --branch release/74
+
+# Switch default branch in a single repo
+
+github-switchbranch --oauth XXXXXXXXXXXXXXXXXXXXXX --branch release/74 --repository ensembl
+
+# Dry run
+github-switchbranch --oauth XXXXXXXXXXXXXXXXXXXXXX --branch release/74 --repository ensembl --dry-run
+
+=head1 DESCRIPTION
+
+A tool for setting the default branch on Ensembl organisation projects held in GitHub. We scan for the user submitted branch and switch it if it is not the active default_branch. 
+
+All of this is done via GitHub's REST API and requires the generation of an oauth token for authentication purposes. You can do this via your account's setting page under Applications and generate a B<Personal Access Token>.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--oauth>
+
+The OAuth token to use. More information is available from L<http://developer.github.com/v3/#authentication> and can be generated from your personal settings page.
+
+=item B<--branch>
+
+The branch to switch to
+
+=item B<--repository|repo>
+
+The repository to switch. If not specified we use all public repositories
+
+=item B<--dry-run>
+
+Do not update the target repo
+
+=item B<--help>
+
+Print the help information
+
+=item B<--man>
+
+Print a man page
+
+=back
+
+=cut
+
