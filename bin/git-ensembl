@@ -76,7 +76,7 @@ sub parse_command_line {
   my $opts = {
     dir => cwd(),
     remote => 'origin',
-    verbose => 1,
+    verbose => 0,
     help => 0,
     man => 0
   };
@@ -99,6 +99,7 @@ sub parse_command_line {
     force_group
     force_module
     config|cfg=s
+    verbose
     help|?
     man
   /) or pod2usage(2);
@@ -676,6 +677,10 @@ Force the interpritation of all additional arguments as modules not as groups
 =item B<--list>
 
 List all available groups
+
+=item B<--verbose>
+
+Make commands more verbose
 
 =item B<--help>
 

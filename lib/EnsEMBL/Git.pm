@@ -264,11 +264,12 @@ sub checkout_tracking {
   return 1;
 }
 
+# Switches a branch
 sub checkout {
   my ($branch, $verbose) = @_;
   die "No branch given" unless $branch;
-  my $v = $verbose ? '--verbose' : q{};
-  return cmd_ok("git checkout $v $branch");
+  my $v = $verbose ? q{} : q{--quiet};
+  return system_ok("git checkout $v $branch");
 }
 
 # Perform a system call which means no capture. We will return if the process successfuly completed
