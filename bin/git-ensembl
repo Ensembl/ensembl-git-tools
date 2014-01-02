@@ -59,6 +59,9 @@ sub run {
     elsif($opts->{checkout}) {
       run_checkout($opts, $grp);
     }
+    elsif($opts->{local_checkout}) {
+      run_local_checkout($opts, $grp);
+    }
     elsif($opts->{pull}) {
       run_pull($opts, $grp);
     }
@@ -84,6 +87,7 @@ sub parse_command_line {
   GetOptions($opts, qw/
     clone
     checkout
+    local_checkout
     branch=s
     secondary_branch=s
     remote=s
@@ -109,6 +113,9 @@ sub parse_command_line {
 
   if($opts->{checkout} && ! $opts->{branch}) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'You must a --branch when using --checkout');
+  }
+  if($opts->{local_checkout} && ! $opts->{branch}) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => 'You must a --branch when using --local_checkout');
   }
 
   # parsing grabbed the -- args so we're left with just the final groups
@@ -203,6 +210,28 @@ sub run_pull {
     return;
   });
   return;
+}
+
+# Loops the group, checks for the existence of the specified branch, 
+# creates it if it does not exist and then performs a checkout
+sub run_local_checkout {
+  my ($opts, $group) = @_;
+  my $branch = $opts->{branch};
+  my $verbose = $opts->{verbose};
+  _loop_modules_and_chdir($opts, $group, sub {
+    # warn current_branch;
+    if(current_branch() eq $branch) {
+      print "* No need to switch. We are already on branch $branch\n";
+      return;
+    }
+    if(! branch_exists($branch)) {
+      print "* Branch $branch does not exist; creating a new one\n";
+      branch($branch, $verbose);
+    }
+    print "* Checking out $branch\n";
+    checkout($branch, $verbose);
+    return;
+  });
 }
 
 sub _checkout_tracking_branch {
@@ -636,7 +665,11 @@ Set the config variable B<user.email> for this clone.
 
 =item B<--checkout>
 
-Checkout the branch specified in the B<--branch> command
+Checkout the remote branch specified in the B<--branch> command
+
+=item B<--local_checkout>
+
+Checkout the branch specified in the B<--branch> command. Works on any branch so long as it exists. If it does not then the branch will be created
 
 =item B<--branch>
 

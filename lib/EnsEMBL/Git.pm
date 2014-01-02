@@ -33,7 +33,7 @@ eval {
 our @EXPORT = qw/
   json
   is_git_repo is_tree_clean is_origin_uptodate
-  clone checkout checkout_tracking pull fetch rebase ff_merge no_ff_merge git_push
+  clone checkout checkout_tracking branch pull fetch rebase ff_merge no_ff_merge git_push
   status
   rev_parse branch_exists current_branch
   get_config add_config unset_all_config
@@ -272,6 +272,15 @@ sub checkout {
   die "No branch given" unless $branch;
   my $v = $verbose ? q{} : q{--quiet};
   return system_ok("git checkout $v $branch");
+}
+
+# Creates a branch from the current working point. You can specify a branch point as well
+sub branch {
+  my ($branch, $verbose, $branchpoint) = @_;
+  die "No branch given" unless $branch;
+  my $v = $verbose ? q{} : q{--quiet};
+  $branchpoint ||= q{};
+  return system_ok("git branch $v $branch $branchpoint");
 }
 
 # Perform a system call which means no capture. We will return if the process successfuly completed
