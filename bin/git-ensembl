@@ -310,7 +310,7 @@ sub _loop_modules_and_chdir {
 # the callback to process the name and it's remote URL
 sub _loop_modules {
   my ($opts, $group, $callback) = @_;
-  printf "* Processing '%s'\n", $group;
+  printf "* Processing '%s'\n\n", $group;
   my $modules_lookup = get_modules($opts);
   my $modules = group_to_modules($opts, $group);
   if(! @{$modules}) {
@@ -331,8 +331,9 @@ sub _loop_modules {
     }
     $callback->($module, $remote);
     $opts->{seen_modules}->{$module} = 1;
+  } continue {
+    print "\n";
   }
-  print "\n";
 
   return;
 }

@@ -278,8 +278,7 @@ sub checkout {
 sub branch {
   my ($branch, $verbose, $branchpoint) = @_;
   die "No branch given" unless $branch;
-  # my $v = $verbose ? q{} : q{--quiet};
-  my $v = q{}; #control this for the moment due to some odd behaviour on different machines
+  my $v = $verbose ? q{--verbose} : q{};
   $branchpoint ||= q{};
   return system_ok("git branch $v $branch $branchpoint");
 }
