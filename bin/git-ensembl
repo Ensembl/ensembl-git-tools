@@ -293,7 +293,7 @@ sub _loop_modules {
       printf "* Skipping '%s' as we have already processed it\n", $module;
       next;
     }
-    printf "* Working with '%s'\n", $module;
+    printf "* Working with module '%s'\n", $module;
     my $remote = $modules_lookup->{$module};
     if(!$remote) {
       printf "* Skipping '%s' as we had no remote URL linked to it. Check your config\n", $module;
