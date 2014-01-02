@@ -22,6 +22,8 @@ use parent qw/Exporter/;
 use Carp;
 use Cwd;
 
+our $DEBUG = 0;
+
 our $JSON = 0;
 eval {
   require JSON;
@@ -275,6 +277,7 @@ sub checkout {
 # Perform a system call which means no capture. We will return if the process successfuly completed
 sub system_ok {
   my ($cmd) = @_;
+  warn $cmd if $DEBUG;
   system($cmd);
   my $exitcode = $? >> 8;
   return ($exitcode == 0) ? 1 : 0;
@@ -283,6 +286,7 @@ sub system_ok {
 # Runs a command and captures its output. Provides two vars; the output and exit code
 sub cmd {
   my ($cmd) = @_;
+  warn $cmd if $DEBUG;
   my $output = `$cmd 2>&1`;
   my $exitcode = $? >> 8;
   return ($output, $exitcode);
