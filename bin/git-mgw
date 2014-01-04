@@ -113,8 +113,17 @@ sub run {
   checkout($trg);
   print "* Checking that $trg is at the same revision as $remote/$trg\n";
   if(!is_origin_uptodate($trg, $remote)) {
-    print STDERR "! Local and remote branches are not on the same hash. Cannot continue\n";
-    exit 7;
+    print "* Not at the same revision. Checking that $remote/$trg can be fast-forward to $trg\n";
+    if(!can_fastforward_merge($trg, $remote)) {
+      print STDERR "! Local and remote branches are not on the same hash and cannnot be fast-forward merged. Cannot continue\n";
+      exit 7;
+    }
+    else {
+      print "* $remote/$trg can be fast-forward merged to $trg. Allowing\n";
+    }
+  }
+  else {
+    print "* $trg and $remote/$trg are on the same revision\n";
   }
   
   # Merges use non-fast-forward and ask the user to confirm the final merge

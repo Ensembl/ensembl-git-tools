@@ -34,6 +34,7 @@ eval {
 our @EXPORT = qw/
   json
   is_git_repo is_tree_clean is_origin_uptodate is_in_merge
+  can_fastforward_merge
   clone checkout checkout_tracking branch pull fetch rebase ff_merge no_ff_merge git_push
   status
   rev_parse branch_exists current_branch
@@ -196,7 +197,7 @@ sub rev_parse {
   my ($rev, $short) = @_;
   die "No rev given" unless $rev;
   my $short_arg = $short ? '--short' : q{};
-  my ($output) = cmd("git rev-parse $short_arg $rev");
+  my ($output) = cmd("git rev-parse --verify $short_arg $rev");
   chomp $output;
   return $output;
 }
@@ -219,6 +220,20 @@ sub is_origin_uptodate {
   my $local_hash  = rev_parse($branch);
   my $remote_hash = rev_parse("$remote/$branch");
   return ($local_hash eq $remote_hash) ? 1 : 0;
+}
+
+# See if the remote's branch can be fast-forwarded onto the local
+# tracking branch. This is done by taking the remote branch hash
+# and see if this is the same as the merge-point of local and remote
+sub can_fastforward_merge {
+  my ($branch, $remote) = @_;
+  die "No branch given" unless $branch;
+  $remote ||= 'origin';
+  fetch(undef, undef, $remote);
+  my $remote_hash = rev_parse("$remote/$branch");
+  my ($output) = cmd("git merge-base $remote/$branch $branch");
+  chomp $output;
+  return ($remote_hash eq $output) ? 1 : 0;
 }
 
 # Attempt to checkout a tracking branch. If the branch already exists locally
