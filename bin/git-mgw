@@ -47,6 +47,32 @@ sub run {
   my $merge = $opts->{merge};
   my $rebase = $opts->{rebase};
   my $remote = $opts->{remote};
+  my $continue = $opts->{continue};
+
+  # Check if we are aborting and then do so
+  if($opts->{abort}) {
+    print "* Aborting the current run\n";
+    my $exit_status = 0;
+    if($rebase) {
+      $exit_status = system_ok('git rebase --abort');
+    }
+    elsif($merge) {
+      $exit_status = system_ok('git reset --merge');
+    }
+    else {
+      print STDERR "! Not sure what I am aborting here\n";
+      $exit_status = 3;
+    }
+    exit $exit_status;
+  }
+
+  if(is_in_merge()) {
+    print STDERR "! Cannot continue. You have not resolved the merge or committed any changes\n";
+    if($merge && $continue) {
+      print STDERR "! Once resolved rerun the git mgw --merge --continue command\n";
+    }
+    exit 3;
+  }
 
   # Checkout target and get latest changes
   checkout($trg);
@@ -66,8 +92,10 @@ sub run {
   if($rebase) {
     my $current_sha1 = rev_parse('HEAD');
 
-    if(!rebase($trg)) {
+    if(!rebase($trg, $continue)) {
       print STDERR "! Could not finish rebase. Please check the error messages for the reason why\n";
+      print STDERR "! To continue after resolving run: git mgw --rebase --continue\n";
+      print STDERR "! To abort run: git mgw --rebase --abort\n";
       exit 5;
     }
 
@@ -85,15 +113,37 @@ sub run {
   checkout($trg);
   print "* Checking that $trg is at the same revision as $remote/$trg\n";
   if(!is_origin_uptodate($trg, $remote)) {
-    print STDERR "! Local and remote branches are not on the same hash. Cannot continue\n";
-    exit 7;
+    print "* Not at the same revision. Checking that $remote/$trg can be fast-forward to $trg\n";
+    if(!can_fastforward_merge($trg, $remote)) {
+      print STDERR "! Local and remote branches are not on the same hash and cannnot be fast-forward merged. Cannot continue\n";
+      exit 7;
+    }
+    else {
+      print "* $remote/$trg can be fast-forward merged to $trg. Allowing\n";
+    }
+  }
+  else {
+    print "* $trg and $remote/$trg are on the same revision\n";
   }
   
   # Merges use non-fast-forward and ask the user to confirm the final merge
   if($merge) {
-    if(! no_ff_merge($src, "Automatic merging of $src into $trg")) {
-      print STDERR "! Could not perform non-fast-forward merge of '${src}' into '${trg}'\n";
-      exit 8;
+    if($continue) {
+      if(is_in_merge()) {
+        print STDERR "! We are still in a merge. You must resolve the merge, add and commit before continuing\n";
+        exit 8;
+      }
+      print "* Continuing the MGW flow\n";
+    }
+    else {
+      checkout($trg);
+      if(! no_ff_merge($src, "Automatic merging of $src into $trg")) {
+        print STDERR "! Could not perform non-fast-forward merge of '${src}' into '${trg}'\n";
+        print STDERR "! Check your merge status, resolve any problems and add into the index and commit\n";
+        print STDERR "! To continue after resolving run: git mgw --merge --continue\n";
+        print STDERR "! To abort run: git mgw --merge --abort\n";
+        exit 8;
+      }
     }
     print "* Please take a moment to review your changes\n";
     print "* Example cmd: git log --oneline --reverse ${trg}...${trg}^\n";
@@ -105,6 +155,7 @@ sub run {
 
   # Rebases need only do a ff merge since we've made sure it's going to be ok
   if($rebase) {
+    checkout($trg);
     if(! ff_merge($src)) {
       print STDERR "! Could not perform fast-forward merge of '${src}' into '${trg}'\n";
       exit 8;
@@ -143,6 +194,8 @@ sub parse_command_line {
     remote => 'origin',
     nopush => 0,
     noprompt => 0,
+    continue => 0,
+    abort => 0,
     merge => 0,
     rebase => 0,
     help => 0,
@@ -155,8 +208,10 @@ sub parse_command_line {
     remote=s
     nopush!
     noprompt!
-    merge
-    rebase
+    continue!
+    abort!
+    merge!
+    rebase!
     help|?
     man
   /) or pod2usage(2);
@@ -230,7 +285,7 @@ git-mgw - Perform the Minimal Git Workflow
 
 =head1 SYNOPSIS
 
-git mgw [--rebase | --merge] [-source BRANCH] [-target BRANCH] [-remote ORIGIN] [-nopush] [-noprompt] [-h] [-m]
+git mgw [--rebase | --merge] [-source BRANCH] [-target BRANCH] [-remote ORIGIN] [-nopush] [-noprompt] [--continue] [--abort] [-h] [-m]
 
 =head1 DESCRIPTION
 
@@ -270,6 +325,14 @@ The name of the remote. Defaults to origin.
 =item B<--nopush>
 
 Do not push changes.
+
+=item B<--continue>
+
+If a previous run of git-mgw has been aborted because of a merge or rebase conflict you can opt to continue mgw once those issues have been resolved.
+
+=item B<--continue>
+
+If a previous run of git-mgw has been aborted because of a merge or rebase conflict you can opt to abort mgw and go back to the original version.
 
 =item B<--noprompt>
 

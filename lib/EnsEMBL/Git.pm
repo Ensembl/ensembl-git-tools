@@ -21,6 +21,7 @@ package EnsEMBL::Git;
 use parent qw/Exporter/;
 use Carp;
 use Cwd;
+use File::Spec;
 
 our $DEBUG = 0;
 
@@ -32,7 +33,8 @@ eval {
 
 our @EXPORT = qw/
   json
-  is_git_repo is_tree_clean is_origin_uptodate
+  is_git_repo is_tree_clean is_origin_uptodate is_in_merge
+  can_fastforward_merge
   clone checkout checkout_tracking branch pull fetch rebase ff_merge no_ff_merge git_push
   status
   rev_parse branch_exists current_branch
@@ -96,6 +98,13 @@ sub is_tree_clean {
   return 1;
 }
 
+sub is_in_merge {
+  my ($git_dir) = cmd('git rev-parse --git-dir');
+  chomp $git_dir;
+  my $merge_head = File::Spec->catfile($git_dir, 'MERGE_HEAD');
+  return (-f $merge_head) ? 1 : 0;
+}
+
 # Perform a clone. Local dir will have the same name as the remote minus the organisation and .git stuff
 sub clone {
   my ($remote_url, $verbose, $remote) = @_;
@@ -143,8 +152,10 @@ sub fetch {
 
 # Rebases against the given branch
 sub rebase {
-  my ($branch) = @_;
-  return system_ok("git rebase $branch");
+  my ($branch, $continue) = @_;
+  die "No branch given" unless $branch;
+  my $continue_arg = $continue ? '--continue' : q{};
+  return system_ok("git rebase $continue_arg $branch");
 }
 
 sub ff_merge {
@@ -186,7 +197,7 @@ sub rev_parse {
   my ($rev, $short) = @_;
   die "No rev given" unless $rev;
   my $short_arg = $short ? '--short' : q{};
-  my ($output) = cmd("git rev-parse $short_arg $rev");
+  my ($output) = cmd("git rev-parse --verify $short_arg $rev");
   chomp $output;
   return $output;
 }
@@ -209,6 +220,20 @@ sub is_origin_uptodate {
   my $local_hash  = rev_parse($branch);
   my $remote_hash = rev_parse("$remote/$branch");
   return ($local_hash eq $remote_hash) ? 1 : 0;
+}
+
+# See if the remote's branch can be fast-forwarded onto the local
+# tracking branch. This is done by taking the remote branch hash
+# and see if this is the same as the merge-point of local and remote
+sub can_fastforward_merge {
+  my ($branch, $remote) = @_;
+  die "No branch given" unless $branch;
+  $remote ||= 'origin';
+  fetch(undef, undef, $remote);
+  my $remote_hash = rev_parse("$remote/$branch");
+  my ($output) = cmd("git merge-base $remote/$branch $branch");
+  chomp $output;
+  return ($remote_hash eq $output) ? 1 : 0;
 }
 
 # Attempt to checkout a tracking branch. If the branch already exists locally
