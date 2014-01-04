@@ -182,6 +182,12 @@ sub run {
   print "* Switching back to $src\n";
   checkout($src);
 
+  # If we were merging we must rebase dev back against master
+  if($merge) {
+    print "* Rebasing $src against $trg as we were using the merge strategy\n";
+    rebase($trg);
+  }
+
   print "* DONE\n";
 
   exit 0;
