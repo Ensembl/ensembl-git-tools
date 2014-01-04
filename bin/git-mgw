@@ -285,7 +285,7 @@ git-mgw - Perform the Minimal Git Workflow
 
 =head1 SYNOPSIS
 
-git mgw [--rebase | --merge] [-source BRANCH] [-target BRANCH] [-remote ORIGIN] [-nopush] [-noprompt] [-h] [-m]
+git mgw [--rebase | --merge] [-source BRANCH] [-target BRANCH] [-remote ORIGIN] [-nopush] [-noprompt] [--continue] [--abort] [-h] [-m]
 
 =head1 DESCRIPTION
 
@@ -325,6 +325,14 @@ The name of the remote. Defaults to origin.
 =item B<--nopush>
 
 Do not push changes.
+
+=item B<--continue>
+
+If a previous run of git-mgw has been aborted because of a merge or rebase conflict you can opt to continue mgw once those issues have been resolved.
+
+=item B<--continue>
+
+If a previous run of git-mgw has been aborted because of a merge or rebase conflict you can opt to abort mgw and go back to the original version.
 
 =item B<--noprompt>
 
