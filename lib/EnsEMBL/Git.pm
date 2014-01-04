@@ -23,7 +23,7 @@ use Carp;
 use Cwd;
 use File::Spec;
 
-our $DEBUG = 1;
+our $DEBUG = 0;
 
 our $JSON = 0;
 eval {
