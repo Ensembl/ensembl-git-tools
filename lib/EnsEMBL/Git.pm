@@ -21,8 +21,9 @@ package EnsEMBL::Git;
 use parent qw/Exporter/;
 use Carp;
 use Cwd;
+use File::Spec;
 
-our $DEBUG = 0;
+our $DEBUG = 1;
 
 our $JSON = 0;
 eval {
@@ -32,7 +33,7 @@ eval {
 
 our @EXPORT = qw/
   json
-  is_git_repo is_tree_clean is_origin_uptodate
+  is_git_repo is_tree_clean is_origin_uptodate is_in_merge
   clone checkout checkout_tracking branch pull fetch rebase ff_merge no_ff_merge git_push
   status
   rev_parse branch_exists current_branch
@@ -96,6 +97,13 @@ sub is_tree_clean {
   return 1;
 }
 
+sub is_in_merge {
+  my ($git_dir) = cmd('git rev-parse --git-dir');
+  chomp $git_dir;
+  my $merge_head = File::Spec->catfile($git_dir, 'MERGE_HEAD');
+  return (-f $merge_head) ? 1 : 0;
+}
+
 # Perform a clone. Local dir will have the same name as the remote minus the organisation and .git stuff
 sub clone {
   my ($remote_url, $verbose, $remote) = @_;
@@ -143,8 +151,10 @@ sub fetch {
 
 # Rebases against the given branch
 sub rebase {
-  my ($branch) = @_;
-  return system_ok("git rebase $branch");
+  my ($branch, $continue) = @_;
+  die "No branch given" unless $branch;
+  my $continue_arg = $continue ? '--continue' : q{};
+  return system_ok("git rebase $continue_arg $branch");
 }
 
 sub ff_merge {
