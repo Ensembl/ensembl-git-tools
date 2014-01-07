@@ -135,8 +135,9 @@ sub pull {
 
 # Push to the specified remote
 sub git_push {
-  my ($remote, $verbose) = @_;
+  my ($remote, $branch, $verbose) = @_;
   $remote ||= 'origin';
+  die "No branch given" unless $branch;
   my $v = $verbose ? '--verbose' : q{};
   return system_ok("git push $v $remote");
 }

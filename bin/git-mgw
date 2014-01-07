@@ -172,8 +172,8 @@ sub run {
       exit 9;
     }
 
-   if(!git_push($remote, 'verbose')) {
-      print STDERR "! Could not push back to $remote. WARNING ON STILL ON '${trg}'\n";
+   if(!git_push($remote, $trg, 'verbose')) {
+      print STDERR "! Could not push back to $remote using branch $trg. WARNING ON STILL ON '${trg}'\n";
       exit 10;
     }
     print "* Finished and pushed changes to $remote\n";
