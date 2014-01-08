@@ -139,7 +139,7 @@ sub git_push {
   $remote ||= 'origin';
   die "No branch given" unless $branch;
   my $v = $verbose ? '--verbose' : q{};
-  return system_ok("git push $v $remote");
+  return system_ok("git push $v $remote $branch");
 }
 
 # Runs a fetch on origin but unlike pull will not do the merge
