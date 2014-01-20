@@ -467,7 +467,6 @@ sub _default_modules {
     'ensembl-production'  => $root.'ensembl-production.git',
     'ensembl-rest'        => $root.'ensembl-rest.git',
     'ensembl-webcode'     => $root.'ensembl-webcode.git',
-    'ensembl-draw'        => $root.'ensembl-draw.git',
     'ensembl-orm'         => $root.'ensembl-orm.git',
     'public-plugins'      => $root.'public-plugins.git',
     'ensembl-hive'        => $root.'ensembl-hive.git',
@@ -505,7 +504,7 @@ sub _default_groups {
     },
     web => {
       desc => 'Libraries required to run the Ensembl website',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode ensembl-draw public-plugins ensembl-orm ensembl-tools/],
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode public-plugins ensembl-orm ensembl-tools/],
     }
   };
 }
