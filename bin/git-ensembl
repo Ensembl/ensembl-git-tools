@@ -679,6 +679,10 @@ Branch to switch to. Used in conjunction with the B<--checkout> and B<--pull> co
 
 Branch to switch to if the original branch given in C<--branch> was not found. Used in conjunction with the B<--clone>, B<--checkout>, and B<--pull> commands
 
+=item B<--status>
+
+Show the repositories status
+
 =item B<--fetch>
 
 Fetch changes from origin and also fetch any tags
