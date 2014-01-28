@@ -7,6 +7,8 @@ use Pod::Usage;
 use Getopt::Long;
 use JSON;
 use HTTP::Tiny;
+use File::Spec;
+use Fcntl ':mode';
 
 my $base_url = 'https://api.github.com';
 my $http = HTTP::Tiny->new();
@@ -40,16 +42,18 @@ sub get_repos {
     print "* Using user submitted repositories\n";
     return $opts->{repository};
   }
-  print "* Fetching all public repositories from GitHub\n";
-  my $json = get_json($opts, '/orgs/Ensembl/repos?type=public', 'GET');
+  my $organisation = $opts->{organisation};
+  print "* Fetching all public repositories from GitHub for $organisation\n";
+  my $json = get_json($opts, "/orgs/${organisation}/repos?type=public", 'GET');
   return [ sort map { $_->{name} } @{$json} ];
 }
 
 sub default_branch {
   my ($opts, $repo) = @_;
   my $branch = $opts->{branch};
+  my $organisation = $opts->{organisation};
   print "*   Checking for default_branch against user branch $branch\n";
-  my $json = get_json($opts, "/repos/Ensembl/${repo}", 'GET');
+  my $json = get_json($opts, "/repos/${organisation}/${repo}", 'GET');
   return 1 if $json->{default_branch} eq $branch;
   return 0;
 }
@@ -57,8 +61,9 @@ sub default_branch {
 sub has_branch {
   my ($opts, $repo) = @_;
   my $branch = $opts->{branch};
+  my $organisation = $opts->{organisation};
   print "*   Checking if $repo has branch $branch\n";
-  my $json = get_json($opts, "/repos/Ensembl/${repo}/branches", 'GET');
+  my $json = get_json($opts, "/repos/${organisation}/${repo}/branches", 'GET');
   foreach my $branch_spec (@{$json}) {
     if($branch_spec->{name} eq $branch) {
       return 1;
@@ -74,29 +79,78 @@ sub update_branch {
     return;
   }
   
+  my $organisation = $opts->{organisation};
   my $branch = $opts->{branch};
+  my $token = get_oauth_token($opts);
   print "*   Updating $repo to branch $branch\n";
-  my $response = $http->request('PATCH', "$base_url/repos/Ensembl/${repo}", {
-    headers => { Authorization => 'token '.$opts->{oauth}},
+  my $response = $http->request('PATCH', "$base_url/repos/${organisation}/${repo}", {
+    headers => { Authorization => 'token '.$token},
     content => encode_json({name => $repo, default_branch => $branch}),
   });
-  die "Failed to update (/repos/Ensembl/${repo})! STATUS: $response->{status} REASON: $response->{reason}\n" unless $response->{success};
+  die "Failed to update (/repos/${organisation}/${repo})! STATUS: $response->{status} REASON: $response->{reason}\n" unless $response->{success};
   print "*   Done\n";
   return;
 }
 
 sub get_json {
   my ($opts, $url, $method) = @_;
+  my $token = get_oauth_token($opts);
   my $options = { headers => { } };
-  $options->{headers}->{Authorization} = 'token '.$opts->{oauth} if $opts->{oauth};
+  $options->{headers}->{Authorization} = 'token '.$token;
   my $response = $http->request($method, $base_url.$url, $options);
   die "Failed to fetch (${url})! STATUS: $response->{status} REASON: $response->{reason}\n" unless $response->{success};
   return decode_json($response->{content});
 }
 
+sub get_oauth_token {
+  my ($opts) = @_;
+  if($opts->{oauth}) {
+    return $opts->{oauth};
+  }
+  my $path = $opts->{oauth_file};
+  my $abs_path = File::Spec->rel2abs($path);
+  if(! -f $abs_path) {
+    die "Cannot find a file at the path $abs_path";
+  }
+
+  my ($vol, $dirs, $file) = File::Spec->splitpath($abs_path);
+
+  # Check the permisssions of the directory. User only
+  my $dir_path = File::Spec->catdir($vol, $dirs);
+  my $dir_mode = (stat($dir_path))[2];
+  if(($dir_mode & S_IRWXO) != 0) { #Exclude others from reading/writing/executing
+    die "Other users have read/write/execute access to dir $dir_path";
+  }
+  if((($dir_mode & S_IRWXG) >> 3) != 0) { #Exclude groups from reading/writing/executing
+    die "Group users have read/write/execute access to dir $dir_path";
+  }
+
+  # Then check the permissions of the file. User only
+  my $file_mode = (stat($abs_path))[2];
+  if(($file_mode & S_IRWXO) != 0) { #Exclude others from reading/writing/executing the file
+    die "Other users have read/write/execute access to path $abs_path";
+  }
+  if((($file_mode & S_IRWXG) >> 3) != 0) { #Exclude group from reading/writing/executing the file
+    die "Group users have read/write/execute access to path $abs_path";
+  }
+
+  #Slurp file in and push into the OAuth variable
+  {
+    local $/ = undef;
+    open my $fh, '<', $abs_path or die "Cannot open $abs_path for reading: $!";
+    my $slurp = <$fh>;
+    close $fh;
+    $slurp =~ s/\s//g; # remove any whitespace
+    $opts->{oauth} = $slurp;
+  }
+
+  return $opts->{oauth};
+}
+
 sub parse_command_line {
   my $opts = {
     repository => [],
+    organisation => 'Ensembl',
     help => 0,
     man => 0
   };
@@ -104,7 +158,9 @@ sub parse_command_line {
   GetOptions($opts, qw/
     repository|repo=s@
     oauth=s
+    oauth_file=s
     branch=s
+    organisation|organization=s
     dry-run
     help|?
     man
@@ -113,8 +169,12 @@ sub parse_command_line {
   pod2usage(1) if $opts->{help};
   pod2usage(-exitval => 0, -verbose => 2) if $opts->{man};
 
-  if(!$opts->{oauth}) {
-    pod2usage(-exitval => 1, -verbose => 1, -msg => 'You must specify a --oauth token');
+  my $oauth_file = $opts->{oauth_file};
+  if(!$opts->{oauth} && !$oauth_file) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => 'You must specify a --oauth token or an --oauth_file');
+  }
+  if($oauth_file && ! -f $oauth_file) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => 'Cannot find the file specified in your --oauth_file param: '.$oauth_file); 
   }
   if(!$opts->{branch}) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'You must specify a --branch to switch to');
@@ -132,7 +192,7 @@ github-switchbranch - A tool for switching default branches in GitHub
 
 =head1 SYNOPSIS
 
-github-switchbranch --oauth OAUTH --branch BRANCH [--repository REPO] [--dry-run] [-h] [-m]
+github-switchbranch --oauth OAUTH [--oauth_file FILE] [--organisation ORG] --branch BRANCH [--repository REPO] [--dry-run] [-h] [-m]
 
 # Switch default branch in all repos
 
@@ -145,11 +205,19 @@ github-switchbranch --oauth XXXXXXXXXXXXXXXXXXXXXX --branch release/74 --reposit
 # Dry run
 github-switchbranch --oauth XXXXXXXXXXXXXXXXXXXXXX --branch release/74 --repository ensembl --dry-run
 
+# Using a OAuth file
+github-switchbranch --oauth_file ~/.private/github-oauth --branch release/74
+
+# Using a different organisation
+github-switchbranch --oauth XXXXXXXXXXXXXXXXXXXXXX --organisation EnsemblGenomes --branch release/release
+
 =head1 DESCRIPTION
 
 A tool for setting the default branch on Ensembl organisation projects held in GitHub. We scan for the user submitted branch and switch it if it is not the active default_branch. 
 
 All of this is done via GitHub's REST API and requires the generation of an oauth token for authentication purposes. You can do this via your account's setting page under Applications and generate a B<Personal Access Token>.
+
+The code can save an OAUTH token in a file and use this for authentication. To do so give it using the B<--oauth_file> option. The file must be readable only by the user (we are strict that access settings must be rw------- for user)
 
 =head1 OPTIONS
 
@@ -158,6 +226,14 @@ All of this is done via GitHub's REST API and requires the generation of an oaut
 =item B<--oauth>
 
 The OAuth token to use. More information is available from L<http://developer.github.com/v3/#authentication> and can be generated from your personal settings page.
+
+=item B<--oauth_file>
+
+The file which contains the OAuth key. Must be just the OAuth token (any whitespace will be removed). The file must be read/write only by the user and its containing directory must be read/write/execute by the user alone.
+
+=item B<--organisation|organization>
+
+The GitHub organisation to list repositories for. Defaults to Ensembl
 
 =item B<--branch>
 
