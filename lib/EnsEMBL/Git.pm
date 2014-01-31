@@ -35,7 +35,7 @@ our @EXPORT = qw/
   json
   is_git_repo is_tree_clean is_origin_uptodate is_in_merge
   can_fastforward_merge
-  clone checkout checkout_tracking branch pull fetch rebase ff_merge no_ff_merge git_push
+  clone checkout checkout_tracking branch pull fetch rebase ff_merge no_ff_merge git_push shallow_clone
   status
   rev_parse branch_exists current_branch
   get_config add_config unset_all_config
@@ -110,6 +110,16 @@ sub clone {
   my ($remote_url, $verbose, $remote) = @_;
   my $v = $verbose ? '--verbose' : q{};
   return system_ok("git clone -o $remote $v $remote_url");
+}
+
+# Perform a clone but do not bring everything down
+sub shallow_clone {
+  my ($remote_url, $verbose, $remote, $depth, $branch) = @_;
+  $depth ||= 1;
+  my $v = $verbose ? '--verbose' : q{};
+  my $b = $branch ? "--branch $branch" : q{};
+  my $d = $depth ? "--depth $depth" : q{};
+  return system_ok("git clone -o $remote $v $d $b $remote_url");
 }
 
 # Attempt to find the given branch locally by looking for its ref. If no ref is found then we have no branch

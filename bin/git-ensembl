@@ -54,7 +54,12 @@ sub run {
   chdir $opts->{dir};
   foreach my $grp (@{$opts->{groups}}) {
     if($opts->{clone}) {
-      run_clone($opts, $grp);
+      if($opts->{depth}) {
+        run_shallowclone($opts, $grp);
+      }
+      else {
+        run_clone($opts, $grp);
+      }
     }
     elsif($opts->{checkout}) {
       run_checkout($opts, $grp);
@@ -86,6 +91,8 @@ sub parse_command_line {
 
   GetOptions($opts, qw/
     clone
+    shallow
+    depth=i
     checkout
     local_checkout
     branch=s
@@ -168,6 +175,27 @@ sub run_clone {
   });
 
   return;
+}
+
+sub run_shallowclone {
+  my ($opts, $group) = @_;
+  my $verbose = $opts->{verbose};
+  _loop_modules($opts, $group, sub {
+    my ($module, $remote_url) = @_;
+
+    if ( -d $module) {
+      print STDERR "! Skipping module as there is already a directory called that; try 'git ensembl --pull'\n";
+      return;
+    }
+
+    print "* Cloning from remote '${remote_url}'\n";
+    if(! shallow_clone($remote_url, $verbose, $opts->{remote}, $opts->{depth}, $opts->{branch})) {
+      print STDERR "! Failed to clone the module '$module'\n";
+      return;
+    }
+
+    return;
+  });
 }
 
 sub run_checkout {
@@ -518,7 +546,7 @@ git-ensembl - Ensembl-centric Git Utility
 
 =head1 SYNOPSIS
 
-git ensembl [--clone [--name NAME] [--email EMAIL] ] 
+git ensembl [--clone [--name NAME] [--email EMAIL] [--depth DEPTH] [--branch BRANCH] ] 
             [--checkout --branch BRANCH --secondary_branch BRANCH] 
             [--pull] [--fetch] [--remote ORIGIN] [--dir DIR] [--groups] [--list]
             [--config CFG_LOCATION]
@@ -536,6 +564,10 @@ git ensembl --clone api
 # Clone and set a new Git username and email
 
 git ensembl --clone --user 'Name' --email 'email@somewhere.com' api
+
+# Clone a set of shallow repositories. Shallow repos cannot be used for development
+
+git ensembl --clone --shallow --depth 1 api
 
 # Clone using SSH
 
@@ -623,7 +655,7 @@ Show available groups and the repos it will work with
 
 =item B<clone>
 
-Clone a set of repos
+Clone a set of repos. B<--shallow> is available to control the depth of clones
 
 =item B<fetch>
 
@@ -651,6 +683,10 @@ The groups to perform actions on. Use B<--list> to find all available groups
 
 Clone the repositories linked to the given group (Ensembl's remote hosted on GitHub)
 
+=item<B--depth>
+
+Clone the repository with the specified depth. By default this is not on
+
 =item B<--ssh>
 
 Use the SSH protocol for cloning rather than HTTPS. HTTPS is the default clone protocol
@@ -673,7 +709,7 @@ Checkout the branch specified in the B<--branch> command. Works on any branch so
 
 =item B<--branch>
 
-Branch to switch to. Used in conjunction with the B<--checkout> and B<--pull> commands
+Branch to switch to. Used in conjunction with the B<--checkout>, B<--clone> (with B<--depth>) and B<--pull> commands
 
 =item B<--secondary_branch>
 
