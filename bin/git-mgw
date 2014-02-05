@@ -44,10 +44,12 @@ sub run {
 
   my $src = $opts->{source};
   my $trg = $opts->{target};
+  my $dev = $opts->{dev};
   my $merge = $opts->{merge};
   my $rebase = $opts->{rebase};
   my $remote = $opts->{remote};
   my $continue = $opts->{continue};
+  my $hotfix = $opts->{hotfix};
 
   # Check if we are aborting and then do so
   if($opts->{abort}) {
@@ -89,6 +91,48 @@ sub run {
     print STDERR "! git mgw --rebase --abort\n";
     print STDERR "! git mgw --rebase --continue\n";
     exit 5;
+  } 
+
+  # Emergency hotfix branching
+  if ($hotfix) {
+    my $hotfix_branch = 'hotfix';
+
+    if (branch_exists($hotfix_branch)) {
+      print STDERR "! $hotfix_branch branch already exists!\n";
+      print STDERR "! Should we destroy this old branch, create a new one, or abort? (d/c/A)...\n";
+      my $in = <STDIN>;
+      if($in =~ /y(es)?/i) {
+        destroy_branch($hotfix_branch);
+      } elsif ($in =~ /c(reate)?/i) {
+        print "* Enter a new branch name:\n";
+        $hotfix_branch = <STDIN>;
+      } else {
+        print STDERR "* Aborting...\n";
+        exit 3;
+      }
+    }
+    reset_staging;
+    stash;
+    checkout($trg);
+
+    print "* Checking that $trg is at the same revision as $remote/$trg\n";
+    if(!is_origin_uptodate($trg, $remote)) {
+      print "* Not at the same revision. Checking that $remote/$trg can be fast-forward to $trg\n";
+      if(!can_fastforward_merge($trg, $remote)) {
+        print STDERR "! Local and remote branches are not on the same hash and cannnot be fast-forward merged. Cannot continue\n";
+        exit 7;
+      }
+      else {
+        print "* $remote/$trg can be fast-forward merged to $trg. Allowing\n";
+      }
+    }
+    else {
+      print "* $trg and $remote/$trg are on the same revision\n";
+    }
+
+    branch($hotfix_branch, 1, $trg);
+    checkout($hotfix_branch);
+    return;
   }
 
   # Checkout target and get latest changes
@@ -204,14 +248,22 @@ sub run {
     print "* Finished and pushed changes to $remote\n";
   }
 
-  print "* Switching back to $src\n";
-  checkout($src);
+  print "* Switching back to $dev\n";
+  checkout($dev);
 
   # If we were merging we must rebase dev back against master
   if($merge) {
-    print "* Rebasing $src against $trg as we were using the merge strategy\n";
+    print "* Rebasing $dev against $trg as we were using the merge strategy\n";
     rebase($trg);
   }
+
+  # Destroy unwanted hotfix branch
+  if ($src eq 'hotfix') {
+    destroy_branch('hotfix');
+  }
+
+  # Pop any stashed saves from a hotfix scenario
+  pop_stash; 
 
   print "* DONE\n";
 
@@ -220,9 +272,11 @@ sub run {
 
 sub parse_command_line {
   my $opts = {
-    source => 'dev',
+    source => current_branch,
+    dev => 'dev',
     target => 'master',
     remote => 'origin',
+    hotfix => 0,
     nopush => 0,
     noprompt => 0,
     continue => 0,
@@ -235,8 +289,10 @@ sub parse_command_line {
 
   GetOptions($opts, qw/
     source=s
+    dev=s
     target=s
     remote=s
+    hotfix!
     nopush!
     noprompt!
     continue!
@@ -265,16 +321,16 @@ sub sanity_checks {
   my $trg = $opts->{target};
   my $rem = $opts->{remote};
 
-  if(! $opts->{merge} && ! $opts->{rebase}) {
-    pod2usage(-exitval => 1, -verbose => 1, -msg => 'You need to specify the --rebase or --merge strategy');
+  if(! $opts->{merge} && ! $opts->{rebase} && ! $opts->{'hotfix'}) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => 'You need to specify the --rebase, --merge or --hotfix strategy');
   }
-  if($opts->{merge} && $opts->{rebase}) {
+  if(($opts->{merge} && ($opts->{rebase} || $opts->{'hotfix'})) || ($opts->{rebase} && $opts->{'hotfix'})) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'Specify either --rebase or --merge');
   }
   if(! is_git_repo()) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'Current directory is not a Git repository');
   }
-  if(! branch_exists($src)) {
+  if(! branch_exists($src) && ! $opts->{'hotfix'}) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => "The branch $src does not exist. Rerun with --source"); 
   }
   if(! branch_exists($trg)) {
@@ -295,7 +351,13 @@ sub sanity_checks {
     }
   }
 
-  printf  "* MGW strategy is '%s'\n", ( $opts->{merge} ? 'merge' : 'rebase');
+  if ($opts->{merge}) {
+    print  "* MGW strategy is merge\n";
+  } elsif ($opts->{rebase}) {
+    print  "* MGW strategy is rebase\n";
+  } else {
+    print  "* MGW strategy is hotfix\n";
+  }
   print   "* Source branch is '$src'\n";
   print   "* Target branch is '$trg'\n";
   print   "* Remote name is '$rem'\n";
@@ -316,7 +378,7 @@ git-mgw - Perform the Minimal Git Workflow
 
 =head1 SYNOPSIS
 
-git mgw [--rebase | --merge] [-source BRANCH] [-target BRANCH] [-remote ORIGIN] [-nopush] [-noprompt] [--continue] [--abort] [-h] [-m]
+git mgw [--rebase | --merge | --hotfix] [-source BRANCH] [-target BRANCH] [-remote ORIGIN] [-nopush] [-noprompt] [--continue] [--abort] [-h] [-m]
 
 =head1 DESCRIPTION
 
@@ -340,6 +402,10 @@ Use the rebase strategy. Can only be applied to a source branch which is not rem
 =item B<--merge>
 
 Use the merge strategy. Safe with all types of branches.
+
+=item B<--hotfix>
+
+Use the hotfix strategy. Safe with all types of branches.
 
 =item B<--source>
 

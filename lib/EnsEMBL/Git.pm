@@ -41,6 +41,9 @@ our @EXPORT = qw/
   get_config add_config unset_all_config
   prompt
   system_ok cmd cmd_ok safe_cwd
+  reset_staging 
+  stash pop_stash
+  destroy_branch
 /;
 
 # Take a path, slurp and convert to a Perl data structure
@@ -367,6 +370,94 @@ sub prompt {
     return 1;
   }
   return 0;
+}
+
+# Count number of entries in stash stack
+sub stash_count {
+  my ($stashes, $res) = cmd('git stash list'); 
+  if ($res != 0) {
+    print STDERR "Failure to list stashes\n";
+    exit 3;
+  }
+  chomp $stashes;
+  return scalar split /^/, $stashes;
+}
+
+# Apply the content of the stash stack IF AND ONLY IF it contains only one entry
+sub pop_stash {
+  my $count = stash_count;
+  if ($count == 0) {
+    return;
+  } elsif ($count == 1) {
+    print 'Found stashed changes, re-apply them to current branch ' . current_branch . "? (y/N)...\n";
+    if($in =~ /y(es)?/i) {
+      my $res = system_ok('git stash pop');
+      if ($res != 0) {
+        print STDERR "Failure to pop stash\n";
+        exit 3;
+      }
+    }
+  } else {
+    print STDERR "Found $count stashed saves, impossible which is the appropriate one to apply\n";
+    exit 3;
+  }
+}
+
+# Stash changes to current branch
+sub stash {
+  if (stash_count > 0) {
+
+    print STDERR "! Data already stashed, cannot jump to hotfix\n";
+    print STDERR "Do you wish to:\n";
+    print STDERR "\t- clear the stack of these former stashes? (c)\n";
+    print STDERR "\t- patch these former stashes to the current branch? (p)?\n";
+    print STDERR "\t- or abort (A)?\n";
+
+    my $in = <STDIN>;
+    if ($in =~ /c/) {
+      my $res = system 'git stash clear';
+      if ($res != 0) {
+        print STDERR "Failure to clear stash\n";
+        exit 3;
+      }
+    } elsif ($in =~ /p/) {
+      while (stash_count > 0) {
+        my $res = system 'git stash pop';
+        if ($res != 0) {
+          print STDERR "Failure to pop stash\n";
+          exit 3;
+        }
+      }
+    } else {
+       print STDERR "Aborting...\n";
+       exit 3;
+    }
+  }
+  
+  my $res = system 'git stash';
+  if ($res != 0) {
+    print STDERR "Failure to list stashes\n";
+    exit 3;
+  }
+}
+
+# Undo staged changes
+sub reset_staging {
+  my $res = system 'git reset';
+  if ($res != 0) {
+    print STDERR "Failure to reset staging area\n";
+    exit 3;
+  }
+}
+
+# Destroy branch 
+sub destroy_branch {
+  my $branch = shift;
+  my $res = system "git branch -D $branch";
+  if ($res != 0) {
+    print STDERR "Failure to reset staging area\n";
+    exit 3;
+  }
 }
 
 1;
