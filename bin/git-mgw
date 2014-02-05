@@ -427,7 +427,7 @@ Do not push changes.
 
 If a previous run of git-mgw has been aborted because of a merge or rebase conflict you can opt to continue mgw once those issues have been resolved.
 
-=item B<--continue>
+=item B<--abort>
 
 If a previous run of git-mgw has been aborted because of a merge or rebase conflict you can opt to abort mgw and go back to the original version.
 
