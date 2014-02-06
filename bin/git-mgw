@@ -50,6 +50,7 @@ sub run {
   my $remote = $opts->{remote};
   my $continue = $opts->{continue};
   my $hotfix = $opts->{hotfix};
+  my $pullrequest = $opts->{pullrequest};
 
   # Check if we are aborting and then do so
   if($opts->{abort}) {
@@ -143,7 +144,19 @@ sub run {
     exit 3;
   }
 
-  if(! pull($remote, 'verbose')) {
+  my $remote_pull;
+  if ($pullrequest) {
+    my $url = get_config("remote.$remote.url");
+    # Get official Ensembl url
+    $url =~ s/github.com([:\/])[^\/]*\//github.com$1Ensembl\//;
+    my $branch = get_config("branch.$trg.merge");
+    $remote_pull = "$url $branch";
+  } else {
+    $remote_pull = $remote;
+  }
+
+  print "* Pulling from $remote_pull\n";
+  if(! pull($remote_pull, 'verbose')) {
     print STDERR "! Could not perform pull from $remote. Aborting\n";
     exit 3;
   }
@@ -277,6 +290,7 @@ sub parse_command_line {
     target => 'master',
     remote => 'origin',
     hotfix => 0,
+    pullrequest => 0,
     nopush => 0,
     noprompt => 0,
     continue => 0,
@@ -292,6 +306,7 @@ sub parse_command_line {
     dev=s
     target=s
     remote=s
+    pullrequest!
     hotfix!
     nopush!
     noprompt!
@@ -320,18 +335,26 @@ sub sanity_checks {
   my $src = $opts->{source};
   my $trg = $opts->{target};
   my $rem = $opts->{remote};
+  print "$src\n";
+  print get_config("branch.${src}.merge") . "\n";
+  #die;
 
   if(! $opts->{merge} && ! $opts->{rebase} && ! $opts->{'hotfix'}) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'You need to specify the --rebase, --merge or --hotfix strategy');
   }
+
   if(($opts->{merge} && ($opts->{rebase} || $opts->{'hotfix'})) || ($opts->{rebase} && $opts->{'hotfix'})) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'Specify either --rebase or --merge');
   }
+  if($opts->{pullrequest} && ! $opts->{rebase} && ! $opts->{merge}) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => 'The --pullrequest only works with the --rebase or --merge options');
+  }
+
   if(! is_git_repo()) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'Current directory is not a Git repository');
   }
-  if(! branch_exists($src) && ! $opts->{'hotfix'}) {
-    pod2usage(-exitval => 1, -verbose => 1, -msg => "The branch $src does not exist. Rerun with --source"); 
+  if(! (branch_exists($src) || $opts->{'hotfix'} || $opts->{continue} || $opts->{abort})) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => "The branch $src does not exist. Rerun with --source or finish your rebase"); 
   }
   if(! branch_exists($trg)) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => "The branch $trg does not exist. Rerun with --target"); 
@@ -378,7 +401,7 @@ git-mgw - Perform the Minimal Git Workflow
 
 =head1 SYNOPSIS
 
-git mgw [--rebase | --merge | --hotfix] [-source BRANCH] [-target BRANCH] [-remote ORIGIN] [-nopush] [-noprompt] [--continue] [--abort] [-h] [-m]
+git mgw [--rebase | --merge | --hotfix] [-source BRANCH] [-target BRANCH] [-remote ORIGIN] [-nopush] [-noprompt] [--continue] [--abort] [--pullrequest] [-h] [-m]
 
 =head1 DESCRIPTION
 
@@ -430,6 +453,10 @@ If a previous run of git-mgw has been aborted because of a merge or rebase confl
 =item B<--abort>
 
 If a previous run of git-mgw has been aborted because of a merge or rebase conflict you can opt to abort mgw and go back to the original version.
+
+=item B<--pullrequest>
+
+If you are preparing for a pull request, updates on the source repo, not your fork.
 
 =item B<--noprompt>
 
