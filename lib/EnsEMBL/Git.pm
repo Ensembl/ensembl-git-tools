@@ -467,10 +467,28 @@ sub stash {
 
 # Undo staged changes
 sub reset_staging {
-  my $res = system 'git reset';
-  if ($res != 0) {
-    print STDERR "Failure to reset staging area\n";
-    exit 3;
+  my $status = `git status`;
+  my $commits = 0;
+  foreach my $line (split /^/, $status) {
+    if ($line =~ /# Changes to be committed:/) {
+      $commits = 1;
+      last;
+    }
+  }
+
+  if ($commits) {
+    print "* You have uncommited staged changes. Do you want to unstage them? y/N...\n";
+    my $in = <STDIN>;
+    if ($in =~ /y(es)?/) {
+      my $res = system 'git reset';
+      if ($res != 0) {
+	print STDERR "Failure to reset staging area\n";
+	exit 3;
+      }
+    } else {
+      print "Aborting...\n";
+      exit 1;
+    }
   }
 }
 
