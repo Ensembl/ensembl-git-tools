@@ -165,8 +165,11 @@ sub fetch {
 sub rebase {
   my ($branch, $continue) = @_;
   die "No branch given" unless $branch;
-  my $continue_arg = $continue ? '--continue' : q{};
-  return system_ok("git rebase $continue_arg $branch");
+  if ($continue) {
+    return system_ok("git rebase --continue");
+  } else {
+    return system_ok("git rebase $branch");
+  }
 }
 
 sub ff_merge {
