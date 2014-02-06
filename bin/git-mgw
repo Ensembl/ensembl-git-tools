@@ -146,9 +146,12 @@ sub run {
 
   my $remote_pull;
   if ($pullrequest) {
-    my $url = get_config("remote.$remote.url");
-    # Get official Ensembl url
-    $url =~ s/github.com([:\/])[^\/]*\//github.com$1Ensembl\//;
+    my $url = get_config("remote.upstream.url");
+    if ($url =~ /^$/) {
+      print STDERR "! Undefined upstream repo! You can set it with something like:\n";
+      print STDERR "git remote add upstream https://github.com/Ensembl/ensembl-PROJECT.git\n";
+      exit 1;
+    }
     my $branch = get_config("branch.$trg.merge");
     $remote_pull = "$url $branch";
   } else {
@@ -372,6 +375,12 @@ sub sanity_checks {
       pod2usage(-exitval => 1, -verbose => 1, 
         -msg => "The $src branch is tracking a remote '$src_remote'. Do not do this. This branch must be a local branch non-tracking branch"); 
     }
+  }
+
+  if ($opts->{pullrequest} && get_config("remote.upstream.url") =~ /^$/) {
+    print STDERR "! Undefined upstream repo! You can set it with something like:\n";
+    print STDERR "git remote add upstream https://github.com/Esnembl/ensembl-PROJECT.git\n";
+    exit 1;
   }
 
   if ($opts->{merge}) {
