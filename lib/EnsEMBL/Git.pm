@@ -405,6 +405,7 @@ sub pop_stash {
 
 # Stash changes to current branch
 sub stash {
+  # Check if previous stashed still stored
   if (stash_count > 0) {
 
     print STDERR "! Data already stashed, cannot jump to hotfix\n";
@@ -434,10 +435,33 @@ sub stash {
     }
   }
   
-  my $res = system 'git stash';
-  if ($res != 0) {
-    print STDERR "Failure to list stashes\n";
-    exit 3;
+  # Test for changes to stash
+  my $status = `git status`;
+  my @lines = split /^/, $status;
+  my $changes = 0;
+  foreach my $line (@lines) {
+    if ($line =~ /^# Changes not staged for commit:/ || $line =~ /^# Untracked files:/) {
+       $changes = 1;
+       last;
+    }
+  }
+  if (!$changes) {
+    return;
+  }
+
+  # Stash if requested
+  print "* Your working directory contains changes\n";
+  print "* Do you wish to stash them or abort? (s/A)...:\n";
+  my $in = <STDIN>;
+  if ($in =~ /s(tash)?/) {
+    my $res = system 'git stash';
+    if ($res != 0) {
+      print STDERR "Failure to list stashes\n";
+      exit 3;
+    }
+  } else {
+    print "* Aborting...\n";
+    exit 1;
   }
 }
 
