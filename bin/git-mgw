@@ -74,8 +74,31 @@ sub run {
     exit 3;
   }
 
+  if ($rebase && $continue) {
+    if(!rebase($trg, $continue)) {
+      print STDERR "! Could not finish rebase. Please check the error messages for the reason why\n";
+      print STDERR "! To continue after resolving run: git mgw --rebase --continue\n";
+      print STDERR "! To abort run: git mgw --rebase --abort\n";
+      exit 5;
+    }
+  }
+
+  if (current_branch eq 'HEAD') {
+    print STDERR "! You are on a headless branch\n";
+    print STDERR "! You are probably in the middle of a rebase, in which case you can either:\n";
+    print STDERR "! git mgw --rebase --abort\n";
+    print STDERR "! git mgw --rebase --continue\n";
+    exit 5;
+  }
+
   # Checkout target and get latest changes
-  checkout($trg);
+  if (! checkout($trg)) {
+    print STDERR "! Could not check out to branch $trg\n";
+    print STDERR "! Are there uncommited changes to commit? Check with:\n";
+    print STDERR "! git status\n";
+    exit 3;
+  }
+
   if(! pull($remote, 'verbose')) {
     print STDERR "! Could not perform pull from $remote. Aborting\n";
     exit 3;
@@ -92,11 +115,13 @@ sub run {
   if($rebase) {
     my $current_sha1 = rev_parse('HEAD');
 
-    if(!rebase($trg, $continue)) {
-      print STDERR "! Could not finish rebase. Please check the error messages for the reason why\n";
-      print STDERR "! To continue after resolving run: git mgw --rebase --continue\n";
-      print STDERR "! To abort run: git mgw --rebase --abort\n";
-      exit 5;
+    if (!$continue) {
+      if(!rebase($trg, $continue)) {
+        print STDERR "! Could not finish rebase. Please check the error messages for the reason why\n";
+        print STDERR "! To continue after resolving run: git mgw --rebase --continue\n";
+        print STDERR "! To abort run: git mgw --rebase --abort\n";
+        exit 5;
+      }
     }
 
     print "* Please take a moment to review your changes.\n";
