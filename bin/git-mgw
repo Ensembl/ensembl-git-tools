@@ -441,11 +441,15 @@ Use the hotfix strategy. Safe with all types of branches.
 
 =item B<--source>
 
-The source branch of changes. Defaults to dev. Cannot be a remote tracking branch if using the --rebase strategy
+The source branch of changes. Defaults to the current branch. Cannot be a remote tracking branch if using the --rebase strategy
 
 =item B<--target>
 
 The target branch of the changes. Defaults to master.
+
+=item B<--dev>
+
+The default dev branch to return to after a commit. Defaults to dev.
 
 =item B<--remote>
 
