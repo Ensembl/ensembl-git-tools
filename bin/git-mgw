@@ -51,6 +51,8 @@ sub run {
   my $continue = $opts->{continue};
   my $hotfix = $opts->{hotfix};
   my $pullrequest = $opts->{pullrequest};
+  my $last = $opts->{last};
+  my $tmp_branch = undef;
 
   # Check if we are aborting and then do so
   if($opts->{abort}) {
@@ -171,9 +173,34 @@ sub run {
   # Start the rebase strategy
   if($rebase) {
     my $current_sha1 = rev_parse('HEAD');
+    my $current_branch = current_branch;
 
     if (!$continue) {
-      if(!rebase($trg, $continue)) {
+      if ($last) {
+        $tmp_branch = 'tmp_branch';
+
+        while (branch_exists($tmp_branch)) {
+          print STDERR "! $tmp_branch branch already exists!\n";
+          print STDERR "! Should we destroy this old branch, create a new one, or abort? (d/c/A)...\n";
+          my $in = <STDIN>;
+          if($in =~ /d(estroy)?/i) {
+            destroy_branch($tmp_branch);
+          } elsif ($in =~ /c(reate)?/i) {
+            print "* Enter a new branch name:\n";
+            $tmp_branch = <STDIN>;
+          } else {
+            print STDERR "* Aborting...\n";
+            exit 3;
+          }
+        }
+      
+        branch($tmp_branch, 1, $src);
+        roll_back($last);
+        checkout($tmp_branch);
+        $src = $tmp_branch;
+      }
+
+      if(!rebase($trg, $continue, $last)) {
         print STDERR "! Could not finish rebase. Please check the error messages for the reason why\n";
         print STDERR "! To continue after resolving run: git mgw --rebase --continue\n";
         print STDERR "! To abort run: git mgw --rebase --abort\n";
@@ -186,6 +213,7 @@ sub run {
     if(! $opts->{noprompt} && ! prompt()) {
       print STDERR "! Process has been abandoned. Please review the changes\n";
       print STDERR "! You can reset the current changes using the following command (this will re-write your history and ref pointers)\n";
+      print STDERR "! git checkout $current_branch\n";
       print STDERR "! git reset $current_sha1\n";
       exit 6;
     }
@@ -242,6 +270,10 @@ sub run {
       print STDERR "! Could not perform fast-forward merge of '${src}' into '${trg}'\n";
       exit 8;
     }
+    if (defined $tmp_branch) {
+      print "* Destroying $tmp_branch\n";
+      destroy_branch($tmp_branch);
+    }
   }
 
   if($opts->{nopush}) {
@@ -293,6 +325,7 @@ sub parse_command_line {
     dev => 'dev',
     target => 'master',
     remote => 'origin',
+    last => 0,
     hotfix => 0,
     pullrequest => 0,
     nopush => 0,
@@ -310,6 +343,7 @@ sub parse_command_line {
     dev=s
     target=s
     remote=s
+    last=s
     pullrequest!
     hotfix!
     nopush!
@@ -364,6 +398,10 @@ sub sanity_checks {
     pod2usage(-exitval => 1, -verbose => 1, -msg => "The branch $trg does not exist. Rerun with --target"); 
   }
 
+  if ($opts->{last} && ! $opts->{merge}) {
+    print STDERR "! --last parameter can only be set in conjunction with the --rebase parameter."
+  }
+
   if($opts->{rebase}) {
     my $src_merge = get_config("branch.${src}.merge");
     my $src_remote = get_config("branch.${src}.remote");
@@ -411,7 +449,7 @@ git-mgw - Perform the Minimal Git Workflow
 
 =head1 SYNOPSIS
 
-git mgw [--rebase | --merge | --hotfix] [-source BRANCH] [-target BRANCH] [-remote ORIGIN] [-nopush] [-noprompt] [--continue] [--abort] [--pullrequest] [-h] [-m]
+git mgw [--rebase | --merge | --hotfix] [-source BRANCH] [-target BRANCH] [-remote ORIGIN] [-nopush] [-noprompt] [--continue] [--abort] [--pullrequest] [--last N] [-h] [-m]
 
 =head1 DESCRIPTION
 
@@ -471,6 +509,10 @@ If a previous run of git-mgw has been aborted because of a merge or rebase confl
 =item B<--pullrequest>
 
 If you are preparing for a pull request, updates on the source repo, not your fork.
+
+=item B<--last>
+
+If you are doing a rebase strategy, you can choose to only rebase the last n commits.
 
 =item B<--noprompt>
 

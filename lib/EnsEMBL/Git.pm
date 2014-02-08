@@ -44,6 +44,7 @@ our @EXPORT = qw/
   reset_staging 
   stash pop_stash
   destroy_branch
+  roll_back
 /;
 
 # Take a path, slurp and convert to a Perl data structure
@@ -166,10 +167,12 @@ sub fetch {
 
 # Rebases against the given branch
 sub rebase {
-  my ($branch, $continue) = @_;
+  my ($branch, $continue, $last) = @_;
   die "No branch given" unless $branch;
   if ($continue) {
     return system_ok("git rebase --continue");
+  } elsif (defined $last and $last) {
+    return system_ok("git rebase --onto $branch HEAD~$last");
   } else {
     return system_ok("git rebase $branch");
   }
@@ -498,6 +501,17 @@ sub destroy_branch {
   my $res = system "git branch -D $branch";
   if ($res != 0) {
     print STDERR "Failure to reset staging area\n";
+    exit 3;
+  }
+}
+
+# Rollback a few commits
+sub roll_back {
+  my $count = shift;
+  my $res = system "git reset --hard HEAD~$count";
+  if ($res != 0) {
+    my $branch = current_branch;
+    print STDERR "Failure to remove $count commits from branch $branch\n";
     exit 3;
   }
 }
