@@ -94,26 +94,23 @@ sub run {
     exit 5;
   } 
 
+  # In case uncommited changes are lying around...
+  stash;
+
   # Emergency hotfix branching
   if ($hotfix) {
-    my $hotfix_branch = 'hotfix';
-
-    if (branch_exists($hotfix_branch)) {
-      print STDERR "! $hotfix_branch branch already exists!\n";
-      print STDERR "! Should we destroy this old branch, create a new one, or abort? (d/c/A)...\n";
+    while (branch_exists('hotfix')) {
+      print STDERR "! 'hotfix' branch already exists!\n";
+      print STDERR "! Should we destroy this old branch, or abort? (d/A)...\n";
       my $in = <STDIN>;
       if($in =~ /y(es)?/i) {
-        destroy_branch($hotfix_branch);
-      } elsif ($in =~ /c(reate)?/i) {
-        print "* Enter a new branch name:\n";
-        $hotfix_branch = <STDIN>;
+        destroy_branch('hotfix');
       } else {
         print STDERR "* Aborting...\n";
         exit 3;
       }
     }
     reset_staging;
-    stash;
     checkout($trg);
 
     print "* Checking that $trg is at the same revision as $remote/$trg\n";
@@ -131,8 +128,8 @@ sub run {
       print "* $trg and $remote/$trg are on the same revision\n";
     }
 
-    branch($hotfix_branch, 1, $trg);
-    checkout($hotfix_branch);
+    branch('hotfix', 1, $trg);
+    checkout('hotfix');
     return;
   }
 
@@ -274,8 +271,12 @@ sub run {
   }
 
   # Destroy unwanted hotfix branch
-  if ($src eq 'hotfix') {
-    destroy_branch('hotfix');
+  if (branch_exists('hotfix')) {
+    print "* Delete hotfix branch? (y/N)...";
+    my $in = <STDIN>;
+    if ($in =~ /y(es)?/) {
+      destroy_branch('hotfix');
+    }
   }
 
   # Pop any stashed saves from a hotfix scenario
