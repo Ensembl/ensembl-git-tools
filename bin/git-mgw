@@ -403,11 +403,11 @@ sub sanity_checks {
   print get_config("branch.${src}.merge") . "\n";
   #die;
 
-  if(! $opts->{merge} && ! $opts->{rebase} && ! $opts->{'hotfix'}) {
+  if(! $opts->{merge} && ! $opts->{rebase} && ! $opts->{hotfix}) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'You need to specify the --rebase, --merge or --hotfix strategy');
   }
 
-  if(($opts->{merge} && ($opts->{rebase} || $opts->{'hotfix'})) || ($opts->{rebase} && $opts->{'hotfix'})) {
+  if(($opts->{merge} && ($opts->{rebase} || $opts->{hotfix})) || ($opts->{rebase} && $opts->{hotfix})) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'Specify either --rebase or --merge');
   }
   if($opts->{pullrequest} && ! $opts->{rebase} && ! $opts->{merge}) {
@@ -417,7 +417,7 @@ sub sanity_checks {
   if(! is_git_repo()) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'Current directory is not a Git repository');
   }
-  if(! (branch_exists($src) || $opts->{'hotfix'} || $opts->{continue} || $opts->{abort})) {
+  if(! (branch_exists($src) || $opts->{hotfix} || $opts->{continue} || $opts->{abort})) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => "The branch $src does not exist. Rerun with --source or finish your rebase"); 
   }
   if(! branch_exists($trg)) {
@@ -476,7 +476,7 @@ git-mgw - Perform the Minimal Git Workflow
 
 =head1 SYNOPSIS
 
-git mgw [--rebase | --merge | --hotfix] [-source BRANCH] [-target BRANCH] [-remote ORIGIN] [-nopush] [-noprompt] [--continue] [--abort] [--pullrequest] [--last N] [-h] [-m]
+git mgw [--rebase | --merge | --hotfix] [-source BRANCH] [--target BRANCH] [--remote ORIGIN] [--nopush] [--noprompt] [--continue] [--abort] [--pullrequest] [--last N] [-h] [-m]
 
 =head1 DESCRIPTION
 
@@ -515,11 +515,23 @@ The target branch of the changes. Defaults to master.
 
 =item B<--dev>
 
-The default dev branch to return to after a commit. Defaults to dev.
+The working dev branch to return to after a commit. Defaults to dev.
+
+=item B<--hotfix_branch>
+
+The name of the hotfix branch. Defaults to hotfix.
+
+=item B<--tmp>
+
+The name of the temporary branch. Defaults to tmp.
 
 =item B<--remote>
 
 The name of the remote. Defaults to origin.
+
+=item B<--upstream>
+
+The name of the upstream. Defaults to upstream.
 
 =item B<--nopush>
 
