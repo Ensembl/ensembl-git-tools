@@ -43,6 +43,7 @@ sub run {
   sanity_checks($opts);
 
   my $src = $opts->{source};
+  my $orig_src = $src;
   my $trg = $opts->{target};
   my $dev = $opts->{dev};
   my $merge = $opts->{merge};
@@ -87,6 +88,16 @@ sub run {
       print STDERR "! To continue after resolving run: git mgw --rebase --continue\n";
       print STDERR "! To abort run: git mgw --rebase --abort\n";
       exit 5;
+    }
+
+    if (current_branch eq $tmp) {
+      checkout($dev);
+      if(!rebase($tmp, $continue)) {
+        print STDERR "! Could not finish rebase. Please check the error messages for the reason why\n";
+        print STDERR "! To continue after resolving run: git mgw --rebase --continue\n";
+        print STDERR "! To abort run: git mgw --rebase --abort\n";
+        exit 5;
+      }
     }
   }
 
@@ -175,7 +186,6 @@ sub run {
   # Start the rebase strategy
   if($rebase) {
     my $current_sha1 = rev_parse('HEAD');
-    my $current_branch = current_branch;
 
     if (!$continue) {
       if ($last) {
@@ -184,10 +194,7 @@ sub run {
           print STDERR "! Should we destroy this old branch, or abort? (d/A)...\n";
           my $in = <STDIN>;
           if($in =~ /d(estroy)?/i) {
-            destroy_branch($tmp_branch);
-          } elsif ($in =~ /c(reate)?/i) {
-            print "* Enter a new branch name:\n";
-            $tmp_branch = <STDIN>;
+            destroy_branch($tmp);
           } else {
             print STDERR "* Aborting...\n";
             exit 3;
@@ -206,8 +213,22 @@ sub run {
         print STDERR "! To abort run: git mgw --rebase --abort\n";
         exit 5;
       }
+      
+      if ($last) {
+        checkout($orig_src);
+
+        if(!rebase($tmp, $continue)) {
+          print STDERR "! Could not finish rebase. Please check the error messages for the reason why\n";
+          print STDERR "! To continue after resolving run: git mgw --rebase --continue\n";
+          print STDERR "! To abort run: git mgw --rebase --abort\n";
+          exit 5;
+        }
+
+        checkout($tmp);
+      }
     }
 
+    my $current_branch = current_branch;
     print "* Please take a moment to review your changes.\n";
     print "* Example cmd: git log --oneline --reverse ${trg}..${src}\n";
     if(! $opts->{noprompt} && ! prompt()) {
