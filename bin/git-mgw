@@ -48,11 +48,13 @@ sub run {
   my $merge = $opts->{merge};
   my $rebase = $opts->{rebase};
   my $remote = $opts->{remote};
+  my $upstream = $opts->{upstream};
   my $continue = $opts->{continue};
   my $hotfix = $opts->{hotfix};
+  my $hotfix_branch = $opts->{hotfix_branch};
+  my $tmp = $opts->{tmp};
   my $pullrequest = $opts->{pullrequest};
   my $last = $opts->{last};
-  my $tmp_branch = undef;
 
   # Check if we are aborting and then do so
   if($opts->{abort}) {
@@ -101,12 +103,12 @@ sub run {
 
   # Emergency hotfix branching
   if ($hotfix) {
-    while (branch_exists('hotfix')) {
-      print STDERR "! 'hotfix' branch already exists!\n";
+    if (branch_exists($hotfix_branch)) {
+      print STDERR "! $hotfix_branch branch already exists!\n";
       print STDERR "! Should we destroy this old branch, or abort? (d/A)...\n";
       my $in = <STDIN>;
       if($in =~ /y(es)?/i) {
-        destroy_branch('hotfix');
+        destroy_branch($hotfix_branch);
       } else {
         print STDERR "* Aborting...\n";
         exit 3;
@@ -130,8 +132,8 @@ sub run {
       print "* $trg and $remote/$trg are on the same revision\n";
     }
 
-    branch('hotfix', 1, $trg);
-    checkout('hotfix');
+    branch($hotfix_branch, 1, $trg);
+    checkout($hotfix_branch);
     return;
   }
 
@@ -145,10 +147,10 @@ sub run {
 
   my $remote_pull;
   if ($pullrequest) {
-    my $url = get_config("remote.upstream.url");
+    my $url = get_config("remote.$upstream.url");
     if ($url =~ /^$/) {
-      print STDERR "! Undefined upstream repo! You can set it with something like:\n";
-      print STDERR "git remote add upstream https://github.com/Ensembl/ensembl-PROJECT.git\n";
+      print STDERR "! Undefined $upstream repo! You can set it with something like:\n";
+      print STDERR "git remote add $upstream https://github.com/Ensembl/ensembl-PROJECT.git\n";
       exit 1;
     }
     my $branch = get_config("branch.$trg.merge");
@@ -177,11 +179,9 @@ sub run {
 
     if (!$continue) {
       if ($last) {
-        $tmp_branch = 'tmp_branch';
-
-        while (branch_exists($tmp_branch)) {
-          print STDERR "! $tmp_branch branch already exists!\n";
-          print STDERR "! Should we destroy this old branch, create a new one, or abort? (d/c/A)...\n";
+        if (branch_exists($tmp)) {
+          print STDERR "! $tmp branch already exists!\n";
+          print STDERR "! Should we destroy this old branch, or abort? (d/A)...\n";
           my $in = <STDIN>;
           if($in =~ /d(estroy)?/i) {
             destroy_branch($tmp_branch);
@@ -194,10 +194,10 @@ sub run {
           }
         }
       
-        branch($tmp_branch, 1, $src);
+        branch($tmp, 1, $src);
         roll_back($last);
-        checkout($tmp_branch);
-        $src = $tmp_branch;
+        checkout($tmp);
+        $src = $tmp;
       }
 
       if(!rebase($trg, $continue, $last)) {
@@ -270,9 +270,9 @@ sub run {
       print STDERR "! Could not perform fast-forward merge of '${src}' into '${trg}'\n";
       exit 8;
     }
-    if (defined $tmp_branch) {
-      print "* Destroying $tmp_branch\n";
-      destroy_branch($tmp_branch);
+    if (branch_exists($tmp)) {
+      print "* Destroying tmp_branch\n";
+      destroy_branch($tmp);
     }
   }
 
@@ -303,11 +303,11 @@ sub run {
   }
 
   # Destroy unwanted hotfix branch
-  if (branch_exists('hotfix')) {
+  if (branch_exists($hotfix_branch)) {
     print "* Delete hotfix branch? (y/N)...";
     my $in = <STDIN>;
     if ($in =~ /y(es)?/) {
-      destroy_branch('hotfix');
+      destroy_branch($hotfix_branch);
     }
   }
 
@@ -325,6 +325,9 @@ sub parse_command_line {
     dev => 'dev',
     target => 'master',
     remote => 'origin',
+    upstream => 'upstream',
+    hotfix_branch => 'hotfix_branch',
+    tmp => 'tmp',
     last => 0,
     hotfix => 0,
     pullrequest => 0,
@@ -343,6 +346,7 @@ sub parse_command_line {
     dev=s
     target=s
     remote=s
+    upstream=s
     last=s
     pullrequest!
     hotfix!
@@ -373,6 +377,7 @@ sub sanity_checks {
   my $src = $opts->{source};
   my $trg = $opts->{target};
   my $rem = $opts->{remote};
+  my $up = $opts->{upstream};
   print "$src\n";
   print get_config("branch.${src}.merge") . "\n";
   #die;
@@ -432,6 +437,7 @@ sub sanity_checks {
   print   "* Source branch is '$src'\n";
   print   "* Target branch is '$trg'\n";
   print   "* Remote name is '$rem'\n";
+  print   "* Upstream name is '$up'\n";
   if(! $opts->{noprompt} && ! prompt()) {
     print STDERR "! Aborting on user request\n";
     exit 2;
