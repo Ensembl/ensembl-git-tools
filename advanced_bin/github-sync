@@ -18,13 +18,9 @@ BEGIN {
 };
 
 use EnsEMBL::Git qw/clone fetch/;
+use EnsEMBL::GitHub qw/parse_oauth_token rest_request/;
 use Pod::Usage;
 use Getopt::Long;
-use JSON;
-use HTTP::Tiny;
-
-my $base_url = 'https://api.github.com';
-my $http = HTTP::Tiny->new();
 
 run();
 
@@ -43,40 +39,43 @@ sub sync_repos {
     print "* Working with $name\n" if $opts->{verbose};
     my $dir = File::Spec->catdir($opts->{dir}, $name);
     my $action;
+    my $cwd = cwd();
     if(! -d $dir) {
       print "* $dir does not exist; cloning repo rather than fetching\n" if $opts->{verbose};
       if( ! $opts->{'dry-run'}) {
+        chdir $opts->{dir};
         clone($url, $opts->{verbose}) or die 'Cannot clone repo '.$name; 
       }
     }
     else {
       print "* Fetching new information from repo (code and tags)\n" if $opts->{verbose};
       if(! $opts->{'dry-run'}) {
-        my $cwd = cwd();
         chdir $dir;
         fetch(undef, $opts->{verbose}) or die 'Cannot fetch new commits for '.$name;
         fetch('tags', $opts->{verbose}) or die 'Cannot fetch tags for '.$name;
-        chdir $cwd;
       }
     }
+    chdir $cwd;
   }
 }
 
 sub get_repos {
   my ($opts) = @_;
   my $organisation = $opts->{organisation};
-  my $repos = get_json($opts, "/orgs/${organisation}/repos", 'GET');
+  my $oauth_token = get_oauth_token($opts);
+  my $repos = rest_request('GET', "/orgs/${organisation}/repos", $oauth_token);
   return $repos unless @{$opts->{repository}};
   my %lookup = map { $_, 1 } @{$opts->{repository}};
   return [ grep { $lookup{$_->{name}} } @{$repos} ];
 }
 
-sub get_json {
-  my ($opts, $url, $method) = @_;
-  my $options = { headers => { } };
-  my $response = $http->request($method, $base_url.$url, $options);
-  die "Failed to fetch (${url})! STATUS: $response->{status} REASON: $response->{reason}\n" unless $response->{success};
-  return decode_json($response->{content});
+sub get_oauth_token {
+  my ($opts) = @_;
+  return $opts->{oauth} if $opts->{oauth};
+  return if ! $opts->{oauth_file};
+  my $path = $opts->{oauth_file};
+  my $token = parse_oauth_token($path);
+  return $opts->{oauth} = $token;
 }
 
 sub parse_command_line {
@@ -91,6 +90,8 @@ sub parse_command_line {
     repository|repo=s@
     dir|directory=s
     organisation|organization=s
+    oauth=s
+    oauth_file=s
     dry-run
     verbose
     help|?
@@ -115,7 +116,7 @@ github-sync - Sync an organisation's repositories
 
 =head1 SYNOPSIS
 
-github-sync --directory DIR [--organisation ORG] [--repository REPO] [--dry-run] [-h] [-m]
+github-sync --directory DIR [--organisation ORG] [--repository REPO] [--oauth OAUTH || --oauth_file FILE] [--dry-run] [-h] [-m]
 
 # Sync all repos in current dir
 
@@ -148,6 +149,14 @@ The GitHub organisation to list repositories for. Defaults to Ensembl
 =item B<--repository|repo>
 
 The repository to use. If not specified we use all public repositories
+
+=item B<--oauth>
+
+The OAuth token to use. More information is available from L<http://developer.github.com/v3/#authentication> and can be generated from your personal settings page. Not required.
+
+=item B<--oauth_file>
+
+The file which contains the OAuth key. Must be just the OAuth token (any whitespace will be removed). The file must be read/write only by the user and its containing directory must be read/write/execute by the user alone. Not required.
 
 =item B<--dry-run>
 

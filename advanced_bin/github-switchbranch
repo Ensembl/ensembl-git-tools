@@ -3,15 +3,28 @@
 use strict;
 use warnings;
 
+BEGIN {
+  use Cwd;
+  use File::Basename;
+  use File::Spec;
+  my $dirname = dirname(Cwd::realpath(__FILE__));
+  my $lib = File::Spec->catdir($dirname, File::Spec->updir(), 'lib');
+  if(-d $lib) {
+    unshift(@INC, $lib);
+  }
+  else {
+    die "Cannot find the lib directory in the expected location $lib";
+  }
+};
+
+use EnsEMBL::GitHub qw/parse_oauth_token rest_request/;
+
 use Pod::Usage;
 use Getopt::Long;
 use JSON;
 use HTTP::Tiny;
 use File::Spec;
 use Fcntl ':mode';
-
-my $base_url = 'https://api.github.com';
-my $http = HTTP::Tiny->new();
 
 run();
 
@@ -44,7 +57,7 @@ sub get_repos {
   }
   my $organisation = $opts->{organisation};
   print "* Fetching all public repositories from GitHub for $organisation\n";
-  my $json = get_json($opts, "/orgs/${organisation}/repos?type=public", 'GET');
+  my $json = get_json($opts, 'GET', "/orgs/${organisation}/repos?type=public");
   return [ sort map { $_->{name} } @{$json} ];
 }
 
@@ -53,7 +66,7 @@ sub default_branch {
   my $branch = $opts->{branch};
   my $organisation = $opts->{organisation};
   print "*   Checking for default_branch against user branch $branch\n";
-  my $json = get_json($opts, "/repos/${organisation}/${repo}", 'GET');
+  my $json = get_json($opts, 'GET', "/repos/${organisation}/${repo}");
   return 1 if $json->{default_branch} eq $branch;
   return 0;
 }
@@ -63,7 +76,7 @@ sub has_branch {
   my $branch = $opts->{branch};
   my $organisation = $opts->{organisation};
   print "*   Checking if $repo has branch $branch\n";
-  my $json = get_json($opts, "/repos/${organisation}/${repo}/branches", 'GET');
+  my $json = get_json($opts, 'GET', "/repos/${organisation}/${repo}/branches");
   foreach my $branch_spec (@{$json}) {
     if($branch_spec->{name} eq $branch) {
       return 1;
@@ -81,70 +94,25 @@ sub update_branch {
   
   my $organisation = $opts->{organisation};
   my $branch = $opts->{branch};
-  my $token = get_oauth_token($opts);
   print "*   Updating $repo to branch $branch\n";
-  my $response = $http->request('PATCH', "$base_url/repos/${organisation}/${repo}", {
-    headers => { Authorization => 'token '.$token},
-    content => encode_json({name => $repo, default_branch => $branch}),
-  });
-  die "Failed to update (/repos/${organisation}/${repo})! STATUS: $response->{status} REASON: $response->{reason}\n" unless $response->{success};
-  print "*   Done\n";
+  get_json($opts, 'PATCH', "/repos/${organisation}/${repo}", {name => $repo, default_branch => $branch});
+  print "* Done\n";
   return;
 }
 
 sub get_json {
-  my ($opts, $url, $method) = @_;
+  my ($opts, $method, $url, $content) = @_;
   my $token = get_oauth_token($opts);
-  my $options = { headers => { } };
-  $options->{headers}->{Authorization} = 'token '.$token;
-  my $response = $http->request($method, $base_url.$url, $options);
-  die "Failed to fetch (${url})! STATUS: $response->{status} REASON: $response->{reason}\n" unless $response->{success};
-  return decode_json($response->{content});
+  return rest_request($method, $url, $token, $content);
 }
 
 sub get_oauth_token {
   my ($opts) = @_;
-  if($opts->{oauth}) {
-    return $opts->{oauth};
-  }
+  return $opts->{oauth} if $opts->{oauth};
+  return if ! $opts->{oauth_file};
   my $path = $opts->{oauth_file};
-  my $abs_path = File::Spec->rel2abs($path);
-  if(! -f $abs_path) {
-    die "Cannot find a file at the path $abs_path";
-  }
-
-  my ($vol, $dirs, $file) = File::Spec->splitpath($abs_path);
-
-  # Check the permisssions of the directory. User only
-  my $dir_path = File::Spec->catdir($vol, $dirs);
-  my $dir_mode = (stat($dir_path))[2];
-  if(($dir_mode & S_IRWXO) != 0) { #Exclude others from reading/writing/executing
-    die "Other users have read/write/execute access to dir $dir_path";
-  }
-  if((($dir_mode & S_IRWXG) >> 3) != 0) { #Exclude groups from reading/writing/executing
-    die "Group users have read/write/execute access to dir $dir_path";
-  }
-
-  # Then check the permissions of the file. User only
-  my $file_mode = (stat($abs_path))[2];
-  if(($file_mode & S_IRWXO) != 0) { #Exclude others from reading/writing/executing the file
-    die "Other users have read/write/execute access to path $abs_path";
-  }
-  if((($file_mode & S_IRWXG) >> 3) != 0) { #Exclude group from reading/writing/executing the file
-    die "Group users have read/write/execute access to path $abs_path";
-  }
-
-  #Slurp file in and push into the OAuth variable
-  {
-    local $/ = undef;
-    open my $fh, '<', $abs_path or die "Cannot open $abs_path for reading: $!";
-    my $slurp = <$fh>;
-    close $fh;
-    $slurp =~ s/\s//g; # remove any whitespace
-    $opts->{oauth} = $slurp;
-  }
-
-  return $opts->{oauth};
+  my $token = parse_oauth_token($path);
+  return $opts->{oauth} = $token;
 }
 
 sub parse_command_line {
