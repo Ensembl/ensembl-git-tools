@@ -109,7 +109,8 @@ sub is_in_merge {
 sub clone {
   my ($remote_url, $verbose, $remote) = @_;
   my $v = $verbose ? '--verbose' : q{};
-  return system_ok("git clone -o $remote $v $remote_url");
+  $remote //= 'origin';
+  return system_ok("git clone $v -o $remote $remote_url");
 }
 
 # Perform a clone but do not bring everything down
