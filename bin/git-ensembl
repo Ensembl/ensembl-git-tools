@@ -76,6 +76,9 @@ sub run {
     elsif($opts->{status}) {
       run_status($opts, $grp);
     }
+    elsif($opts->{cmd}) {
+      run_git_cmd($opts, $grp);
+    }
   }
   exit 0;
 }
@@ -100,6 +103,7 @@ sub parse_command_line {
     remote=s
     pull
     fetch
+    cmd=s
     status
     dir=s
     groups
@@ -309,6 +313,16 @@ sub run_status {
   my ($opts, $group) = @_;
   _loop_modules_and_chdir($opts, $group, sub {
     status();
+    return;
+  });
+  return;
+}
+
+sub run_git_cmd {
+  my ($opts, $group) = @_;
+  my $cmd = $opts->{cmd};
+  _loop_modules_and_chdir($opts, $group, sub {
+    system_ok("git $cmd");
     return;
   });
   return;
@@ -551,6 +565,7 @@ git ensembl [--clone [--name NAME] [--email EMAIL] [--depth DEPTH] [--branch BRA
             [--pull] [--fetch] [--remote ORIGIN] [--dir DIR] [--groups] [--list]
             [--config CFG_LOCATION]
             [--force_group] [--force_module]
+            [--cmd 'CMD']
             [-v] [-h] [-m] GROUPS_OR_MODULES
 
 # List all available groups
@@ -669,6 +684,10 @@ Switch branch in all repositories (will fetch from origin first and will create 
 
 Fetch remote changes and merge them into the current branch
 
+=item B<cmd>
+
+Apply a generic git command across multiple repositories.
+
 =back
 
 =head1 OPTIONS
@@ -722,6 +741,12 @@ Show the repositories status
 =item B<--fetch>
 
 Fetch changes from origin and also fetch any tags
+
+=item B<--cmd>
+
+When specified we expect the value to be a git command to apply to each and every repository/group specifed. For example if you wanted to list the current hash on all API modules you can use
+
+  git ensembl --cmd 'rev-parse HEAD' api
 
 =item B<--pull>
 
