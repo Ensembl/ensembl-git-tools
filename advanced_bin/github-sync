@@ -17,7 +17,7 @@ BEGIN {
   }
 };
 
-use EnsEMBL::Git qw/clone fetch/;
+use EnsEMBL::Git qw/bare_clone fetch/;
 use EnsEMBL::GitHub qw/parse_oauth_token rest_request/;
 use Pod::Usage;
 use Getopt::Long;
@@ -44,7 +44,7 @@ sub sync_repos {
       print "* $dir does not exist; cloning repo rather than fetching\n" if $opts->{verbose};
       if( ! $opts->{'dry-run'}) {
         chdir $opts->{dir};
-        clone($url, $opts->{verbose}) or die 'Cannot clone repo '.$name; 
+        bare_clone($url, $opts->{verbose}) or die 'Cannot clone repo '.$name; 
       }
     }
     else {
