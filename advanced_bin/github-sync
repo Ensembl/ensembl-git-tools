@@ -37,7 +37,7 @@ sub sync_repos {
     my $name = $repo->{name};
     my $url = $repo->{clone_url};
     print "* Working with $name\n" if $opts->{verbose};
-    my $dir = File::Spec->catdir($opts->{dir}, $name);
+    my $dir = File::Spec->catdir($opts->{dir}, $name.'.git');
     my $action;
     my $cwd = cwd();
     if(! -d $dir) {
