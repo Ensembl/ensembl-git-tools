@@ -126,10 +126,9 @@ sub shallow_clone {
 
 # Perform a clone but do not create a working sandbox (so just the contents of .git)
 sub bare_clone {
-  my ($remote_url, $verbose, $remote) = @_;
-  $remote //= 'origin';
+  my ($remote_url, $verbose) = @_;
   my $v = $verbose ? '--verbose' : q{};
-  return system_ok("git clone $v --bare -o $remote $remote_url");
+  return system_ok("git clone $v --bare $remote_url");
 }
 
 # Attempt to find the given branch locally by looking for its ref. If no ref is found then we have no branch
