@@ -103,6 +103,7 @@ sub parse_command_line {
     status
     dir=s
     groups
+    rebase
     list
     ssh
     name=s
@@ -221,6 +222,7 @@ sub run_pull {
   my $secondary_branch = $opts->{secondary_branch};
   my $verbose = $opts->{verbose};
   my $remote = $opts->{remote};
+  my $rebase = $opts->{rebase};
   _loop_modules_and_chdir($opts, $group, sub {
     my ($module) = @_;
     if($branch) {
@@ -232,7 +234,7 @@ sub run_pull {
     }
 
     print "* Performing pull\n";
-    pull($remote, $verbose);
+    pull($remote, $verbose, $rebase);
     fetch('tags', $verbose);
 
     return;
@@ -507,6 +509,7 @@ sub _default_modules {
     'ensembl-xs'          => $root.'ensembl-xs.git',
     'ensembl-internal-variation'   => $root.'ensembl-internal-variation.git',
     'ensembl-test'        => $root.'ensembl-test.git',
+    'ensembl-git-tools'   => $root.'ensembl-git-tools.git',
   }
 }
 
@@ -548,7 +551,7 @@ git-ensembl - Ensembl-centric Git Utility
 
 git ensembl [--clone [--name NAME] [--email EMAIL] [--depth DEPTH] [--branch BRANCH] ] 
             [--checkout --branch BRANCH --secondary_branch BRANCH] 
-            [--pull] [--fetch] [--remote ORIGIN] [--dir DIR] [--groups] [--list]
+            [--pull] [--fetch] [--remote ORIGIN] [--dir DIR] [--groups] [--list] [--rebase]
             [--config CFG_LOCATION]
             [--force_group] [--force_module]
             [-v] [-h] [-m] GROUPS_OR_MODULES
@@ -714,6 +717,10 @@ Branch to switch to. Used in conjunction with the B<--checkout>, B<--clone> (wit
 =item B<--secondary_branch>
 
 Branch to switch to if the original branch given in C<--branch> was not found. Used in conjunction with the B<--clone>, B<--checkout>, and B<--pull> commands
+
+=item B<--rebase>
+
+When performing PULL requests rebase your local changes onto the remote tracking branch. Do not merge.
 
 =item B<--status>
 
