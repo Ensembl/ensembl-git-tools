@@ -65,17 +65,28 @@ sub run {
   foreach my $change (@{$changes}) {
     my ($status, $file) = @{$change};
     if($status eq 'D') {
-      print "* DELETED  $file\n";
+      print "* DELETED  $file ... ";
       my $target = File::Spec->catfile($opts->{cvs}, $file);
       if(-f $target) {
         unlink($target) or die "Cannot unlink file ${target}: $!\n";
+        rm_from_cvs($opts, $file);
+        print "removed\n";
       }
-      rm_from_cvs($opts, $file);
+      else {
+        print "skipping. File missing. Assuming already deleted\n";
+      }
     }
     elsif($status eq 'A') {
-      print "* ADDED    $file\n";
-      copy_to_cvs($opts, $file);
-      add_to_cvs($opts, $file);
+      print "* ADDED    $file ... ";
+      my $target = File::Spec->catfile($opts->{cvs}, $file);
+      if(! -f $target) {
+        copy_to_cvs($opts, $file);
+        add_to_cvs($opts, $file);
+        print "added\n";
+      }
+      else {
+        print "skipping. File was already there\n";
+      }
     }
     elsif($status eq 'M') {
       print "* MODIFIED $file\n";
