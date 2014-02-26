@@ -97,7 +97,7 @@ sub run {
     }
   }
   print "* COMMITTING EVERYTHING\n";
-  commit_cvs($opts, $file);
+  commit_cvs($opts);
 
   print "* Prune empty directories from CVS\n";
   safe_cwd($opts->{cvs}, sub {
