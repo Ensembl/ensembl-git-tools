@@ -95,9 +95,9 @@ sub run {
     else {
       die "Do not understand the status $status";
     }
-    print "* COMMITTED $file\n";
-    commit_cvs($opts, $file);
   }
+  print "* COMMITTING EVERYTHING\n";
+  commit_cvs($opts, $file);
 
   print "* Prune empty directories from CVS\n";
   safe_cwd($opts->{cvs}, sub {
@@ -127,6 +127,7 @@ sub parse_command_line {
     target_commitid=s
     commitid=s
     exclude=s@
+    skip-diff
     dry-run
     help|?
     man
@@ -232,6 +233,15 @@ sub current_cvs_branch {
 # we bail
 sub diff_git_cvs {
   my ($opts) = @_;
+
+  if($opts->{'skip-diff'}) {
+    print "* WARNING; you are going to skip the diff. This is not a good thing to do.\n";
+    if(!prompt()) {
+      exit 5;
+    }
+    return;
+  }
+
   my $cvs = $opts->{cvs};
   my $git = cwd();
   my @default_exclusions = qw/CVS .git .DS_Store/;
