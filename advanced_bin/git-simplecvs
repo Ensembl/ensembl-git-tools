@@ -118,6 +118,7 @@ sub parse_command_line {
     git => cwd(),
     exclude => [],
     'dry-run' => 0,
+    'skip-diff' => 0,
     help => 0,
     man => 0
   };
@@ -127,8 +128,8 @@ sub parse_command_line {
     target_commitid=s
     commitid=s
     exclude=s@
-    skip-diff
     dry-run
+    skip-diff
     help|?
     man
   /) or pod2usage(2);
@@ -376,6 +377,10 @@ Exclude the following files from any diff this program performs between CVS and 
 =item B<--dry-run>
 
 Perform everything including copying and deleting files but do not issue any CVS commands.
+
+=item B<--skip-diff>
+
+Skip the CVS to Git diff. Really watch out when doing this.
 
 =item B<--help>
 
