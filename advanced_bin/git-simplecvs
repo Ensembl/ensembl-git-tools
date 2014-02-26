@@ -257,7 +257,7 @@ sub add_to_cvs {
   return if $opts->{'dry-run'};
   add_cvs_dir($opts, $file);
   safe_cwd($opts->{cvs}, sub {
-    my $kb_flag = (-f $file && -B $file) ? '--kb' : q{};
+    my $kb_flag = (-f $file && -B $file) ? '-kb' : q{};
     my ($output, $rc) = cmd("cvs add $kb_flag $file");
     if($rc != 0) {
       # We can get the output "cvs add: `file' already exists, with version number 1.2"
