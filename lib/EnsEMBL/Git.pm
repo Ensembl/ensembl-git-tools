@@ -24,6 +24,7 @@ use Cwd;
 use File::Spec;
 
 our $DEBUG = 0;
+$DEBUG = $ENV{ENS_GIT_DEBUG} if $ENV{ENS_GIT_DEBUG};
 
 our $JSON = 0;
 eval {
@@ -137,10 +138,11 @@ sub tag_exists {
 
 # Runs a pull on whatever is the current branch (which means fetch & merge)
 sub pull {
-  my ($remote, $verbose) = @_;
+  my ($remote, $verbose, $rebase) = @_;
   $remote ||= 'origin';
   my $v = $verbose ? '--verbose' : q{};
-  return system_ok("git pull $v $remote");
+  my $re = $rebase ? '--rebase' : q{};
+  return system_ok("git pull $re $v $remote");
 }
 
 # Push to the specified remote
