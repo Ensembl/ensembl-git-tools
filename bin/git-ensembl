@@ -444,11 +444,15 @@ sub get_groups {
     (%{$cmd_cfg->{groups} || {}}),
   };
   
-  if(! exists $groups->{all}) {
+  if(! exists $groups->{all} || ! exists $groups->{available}) {
     my $modules = get_modules($opts);
-    $groups->{all} = {
+    $groups->{all} ||= {
       desc => 'An auto-genreated group pointing at all modules known to the script. Use this to apply commands to all repositories',
       modules => [keys %{$modules}],
+    };
+    $groups->{available} ||= {
+      desc => 'An auto-genreated group pointing at all modules known to the script, and available in the directory. Use this to apply commands to all available repositories',
+      modules => [grep -d, keys %{$modules}],
     };
   }
   
