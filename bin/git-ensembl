@@ -50,8 +50,8 @@ sub run {
     exit 0;
   }
 
-  verify_groups($opts);
   chdir $opts->{dir};
+  verify_groups($opts);
   foreach my $grp (@{$opts->{groups}}) {
     if($opts->{clone}) {
       if($opts->{depth}) {
