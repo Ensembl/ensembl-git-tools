@@ -54,7 +54,6 @@ sub run {
   my $hotfix = $opts->{hotfix};
   my $hotfix_branch = $opts->{hotfix_branch};
   my $tmp = $opts->{tmp};
-  my $pullrequest = $opts->{pullrequest};
   my $last = $opts->{last};
 
   # Check if we are aborting and then do so
@@ -148,26 +147,28 @@ sub run {
     return;
   }
 
+  my $forked = 0;
+  my $remote_pull = $remote;
+  my $upstream_url = get_config("remote.$upstream.url");
+  if (length $upstream_url > 0) {
+    $forked = 1; 
+    if ($merge) {
+      print "* This is a forked repository, are you sure you want to do a merge? A rebase would be better... (yes/Abort)";
+      my $in = <STDIN>;
+      if ($in !~ /^Yy/) {
+        exit 1;
+      }
+    }
+    my $branch = get_config("branch.$trg.merge");
+    $remote_pull = "$upstream_url $branch";
+  }
+
   # Checkout target and get latest changes
   if (! checkout($trg)) {
     print STDERR "! Could not check out to branch $trg\n";
     print STDERR "! Are there uncommited changes to commit? Check with:\n";
     print STDERR "! git status\n";
     exit 3;
-  }
-
-  my $remote_pull;
-  if ($pullrequest) {
-    my $url = get_config("remote.$upstream.url");
-    if ($url =~ /^$/) {
-      print STDERR "! Undefined $upstream repo! You can set it with something like:\n";
-      print STDERR "git remote add $upstream https://github.com/Ensembl/ensembl-PROJECT.git\n";
-      exit 1;
-    }
-    my $branch = get_config("branch.$trg.merge");
-    $remote_pull = "$url $branch";
-  } else {
-    $remote_pull = $remote;
   }
 
   print "* Pulling from $remote_pull\n";
@@ -351,7 +352,6 @@ sub parse_command_line {
     tmp => 'tmp',
     last => 0,
     hotfix => 0,
-    pullrequest => 0,
     nopush => 0,
     noprompt => 0,
     continue => 0,
@@ -369,7 +369,6 @@ sub parse_command_line {
     remote=s
     upstream=s
     last=s
-    pullrequest!
     hotfix!
     nopush!
     noprompt!
@@ -410,9 +409,6 @@ sub sanity_checks {
   if(($opts->{merge} && ($opts->{rebase} || $opts->{hotfix})) || ($opts->{rebase} && $opts->{hotfix})) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'Specify either --rebase or --merge');
   }
-  if($opts->{pullrequest} && ! $opts->{rebase} && ! $opts->{merge}) {
-    pod2usage(-exitval => 1, -verbose => 1, -msg => 'The --pullrequest only works with the --rebase or --merge options');
-  }
 
   if(! is_git_repo()) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'Current directory is not a Git repository');
@@ -442,12 +438,6 @@ sub sanity_checks {
     }
   }
 
-  if ($opts->{pullrequest} && get_config("remote.upstream.url") =~ /^$/) {
-    print STDERR "! Undefined upstream repo! You can set it with something like:\n";
-    print STDERR "git remote add upstream https://github.com/Esnembl/ensembl-PROJECT.git\n";
-    exit 1;
-  }
-
   if ($opts->{merge}) {
     print  "* MGW strategy is merge\n";
   } elsif ($opts->{rebase}) {
@@ -464,6 +454,25 @@ sub sanity_checks {
     exit 2;
   }
 
+  my $origin_url = get_config("remote.$rem.url");
+  if ($origin_url =~ /github.com/ && $origin_url !~ /github.com[\/:]Ensembl/ && length get_config("remote.$up.url") == 0) {
+    print "* It would appear that your repository looks a lot like a forked repository\n";
+    print "* If it is, you need to tell git with the following command:\n";
+    my $suggested_upstream = $origin_url;
+    $suggested_upstream =~ s/github.com([\/:])[^\/]*\//github.com$1Ensembl\//;
+    print "*\tgit remote add upstream $suggested_upstream\n";
+    print "* Do you want to register the upstream repo now? y/n/A\n";
+    my $in = <STDIN>;
+    if ($in =~ /^[yY]/) {
+      if (! add_remote('upstream', $suggested_upstream)) {
+        print STDERR "! Failed to add remote repository !\n";
+	exit 10;
+      }
+    } elsif (! $in =~ /^[nN]/) {
+      print "Exiting...\n";
+      exit 1;
+    }
+  }
   return;
 }
 
@@ -544,10 +553,6 @@ If a previous run of git-mgw has been aborted because of a merge or rebase confl
 =item B<--abort>
 
 If a previous run of git-mgw has been aborted because of a merge or rebase conflict you can opt to abort mgw and go back to the original version.
-
-=item B<--pullrequest>
-
-If you are preparing for a pull request, updates on the source repo, not your fork.
 
 =item B<--last>
 
