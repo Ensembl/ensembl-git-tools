@@ -22,6 +22,7 @@ use parent qw/Exporter/;
 use Carp;
 use Cwd;
 use File::Spec;
+use strict;
 
 our $DEBUG = 0;
 
@@ -302,7 +303,7 @@ sub checkout_tracking {
   }
   if($exitcode) {
     print STDERR 
-      "Could not switch $GIT_DIR to branch '${branch}' using options ${args}.\n", 
+      "Could not switch to branch '${branch}' using options ${args}.\n", 
       'Command output:', "\n",
       $output,"\n";
     return 0;
@@ -393,6 +394,7 @@ sub pop_stash {
     return;
   } elsif ($count == 1) {
     print 'Found stashed changes, re-apply them to current branch ' . current_branch . "? (y/N)...\n";
+    my $in = <STDIN>;
     if($in =~ /y(es)?/i) {
       my $res = system_ok('git stash pop');
       if ($res != 0) {
