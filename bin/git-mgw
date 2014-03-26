@@ -258,43 +258,46 @@ sub run {
     print "* $trg and $remote/$trg are on the same revision\n";
   }
   
-  # Merges use non-fast-forward and ask the user to confirm the final merge
-  if($merge) {
-    if($continue) {
-      if(is_in_merge()) {
-        print STDERR "! We are still in a merge. You must resolve the merge, add and commit before continuing\n";
+  # On a forked repo, we prefer to leave master independent of development
+  if (!$forked) {
+    # Merges use non-fast-forward and ask the user to confirm the final merge
+    if($merge) {
+      if($continue) {
+        if(is_in_merge()) {
+          print STDERR "! We are still in a merge. You must resolve the merge, add and commit before continuing\n";
+          exit 8;
+        }
+        print "* Continuing the MGW flow\n";
+      }
+      else {
+        checkout($trg);
+        if(! no_ff_merge($src, "Automatic merging of $src into $trg")) {
+          print STDERR "! Could not perform non-fast-forward merge of '${src}' into '${trg}'\n";
+          print STDERR "! Check your merge status, resolve any problems and add into the index and commit\n";
+          print STDERR "! To continue after resolving run: git mgw --merge --continue\n";
+          print STDERR "! To abort run: git mgw --merge --abort\n";
+          exit 8;
+        }
+      }
+      print "* Please take a moment to review your changes\n";
+      print "* Example cmd: git log --oneline --reverse ${trg}...${trg}^\n";
+      if(! $opts->{noprompt} && ! prompt()) {
+        print STDERR "! Abandoned work\n";
         exit 8;
       }
-      print "* Continuing the MGW flow\n";
     }
-    else {
-      checkout($trg);
-      if(! no_ff_merge($src, "Automatic merging of $src into $trg")) {
-        print STDERR "! Could not perform non-fast-forward merge of '${src}' into '${trg}'\n";
-        print STDERR "! Check your merge status, resolve any problems and add into the index and commit\n";
-        print STDERR "! To continue after resolving run: git mgw --merge --continue\n";
-        print STDERR "! To abort run: git mgw --merge --abort\n";
-        exit 8;
-      }
-    }
-    print "* Please take a moment to review your changes\n";
-    print "* Example cmd: git log --oneline --reverse ${trg}...${trg}^\n";
-    if(! $opts->{noprompt} && ! prompt()) {
-      print STDERR "! Abandoned work\n";
-      exit 8;
-    }
-  }
 
-  # Rebases need only do a ff merge since we've made sure it's going to be ok
-  if($rebase) {
-    checkout($trg);
-    if(! ff_merge($src)) {
-      print STDERR "! Could not perform fast-forward merge of '${src}' into '${trg}'\n";
-      exit 8;
-    }
-    if (branch_exists($tmp)) {
-      print "* Destroying tmp_branch\n";
-      destroy_branch($tmp);
+    # Rebases need only do a ff merge since we've made sure it's going to be ok
+    if($rebase) {
+      checkout($trg);
+      if(! ff_merge($src)) {
+        print STDERR "! Could not perform fast-forward merge of '${src}' into '${trg}'\n";
+        exit 8;
+      }
+      if (branch_exists($tmp)) {
+        print "* Destroying tmp_branch\n";
+        destroy_branch($tmp);
+      }
     }
   }
 
@@ -308,9 +311,23 @@ sub run {
       exit 9;
     }
 
-   if(!git_push($remote, $trg, 'verbose')) {
-      print STDERR "! Could not push back to $remote using branch $trg. WARNING ON STILL ON '${trg}'\n";
-      exit 10;
+    if (!$forked) {
+      if(!git_push($remote, $trg, 'verbose')) {
+        print STDERR "! Could not push back to $remote using branch $trg. WARNING ON STILL ON '${trg}'\n";
+        exit 10;
+      }
+    } else {
+      if (! branch_exists($src, $remote)) {
+	if (! create_remote_branch($src, $remote)) {
+	  print STDERR "! Could not push back to $remote using branch $src. WARNING ON STILL ON '${trg}'\n";
+	  exit 10;
+
+	}
+      }
+      if(!git_push($remote, $src, 'verbose')) {
+        print STDERR "! Could not push back to $remote using branch $src. WARNING ON STILL ON '${trg}'\n";
+        exit 10;
+      }
     }
     print "* Finished and pushed changes to $remote\n";
   }

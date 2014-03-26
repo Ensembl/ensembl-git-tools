@@ -46,6 +46,8 @@ our @EXPORT = qw/
   stash pop_stash
   destroy_branch
   roll_back
+  add_remote
+  create_remote_branch
 /;
 
 # Take a path, slurp and convert to a Perl data structure
@@ -134,6 +136,11 @@ sub branch_exists {
   return cmd_ok("git show-ref --verify --quiet refs/${ref_loc}/${branch}");
 }
 
+sub create_remote_branch {
+  my ($branch, $remote) = @_;
+  return system_ok("git push -u $remote $branch");
+}
+
 # Attempt to find the given tag
 sub tag_exists {
   my ($tag) = @_;
@@ -164,6 +171,14 @@ sub fetch {
   my $tags = ($fetch_tags) ? '--tags' : q{};
   $remote ||= 'origin';
   return system_ok("git fetch $v $tags $remote");
+}
+
+# Add remote branch url
+
+sub add_remote {
+  my ($remote_name, $remote_url) = @_;
+  print "git remote add $remote_name $remote_url\n";
+  return system_ok("git remote add $remote_name $remote_url");
 }
 
 # Rebases against the given branch
