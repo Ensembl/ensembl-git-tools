@@ -398,9 +398,6 @@ sub sanity_checks {
   my $trg = $opts->{target};
   my $rem = $opts->{remote};
   my $up = $opts->{upstream};
-  print "$src\n";
-  print get_config("branch.${src}.merge") . "\n";
-  #die;
 
   if(! $opts->{merge} && ! $opts->{rebase} && ! $opts->{hotfix}) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'You need to specify the --rebase, --merge or --hotfix strategy');
