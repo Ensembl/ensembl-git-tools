@@ -16,12 +16,20 @@
 use strict;
 use warnings;
 
+# This normally lives in ~ensembl/git-ensembl.cfg or ~/git-ensembl.cfg
+my $CFG_FILE = 'git-ensembl.cfg';
+# All default ensembl repos have this public root
+my $GITHUB_HTTPS_ROOT = 'https://github.com/Ensembl/';
+my $GITHUB_SSH_ROOT = 'ssh://git@github.com/Ensembl/';
+my $HOOKS_DIR;
+
 BEGIN {
   use Cwd;
   use File::Basename;
   use File::Spec;
   my $dirname = dirname(Cwd::realpath(__FILE__));
   my $lib = File::Spec->catdir($dirname, File::Spec->updir(), 'lib');
+  $HOOKS_DIR = File::Spec->catdir($dirname, File::Spec->updir(), 'hooks');
   if(-d $lib) {
     unshift(@INC, $lib);
   }
@@ -34,12 +42,6 @@ use Pod::Usage;
 use Getopt::Long;
 use Cwd;
 use EnsEMBL::Git;
-
-# This normally lives in ~ensembl/git-ensembl.cfg or ~/git-ensembl.cfg
-my $CFG_FILE = 'git-ensembl.cfg';
-# All default ensembl repos have this public root
-my $GITHUB_HTTPS_ROOT = 'https://github.com/Ensembl/';
-my $GITHUB_SSH_ROOT = 'ssh://git@github.com/Ensembl/';
 
 run();
 
@@ -165,7 +167,7 @@ sub run_clone {
       });
     }
     
-    #And finally switch branch if we had that info
+    # Switch branch if we had that info
     my $branch = $opts->{branch};
     my $secondary_branch = $opts->{secondary_branch};
     if($branch) {
@@ -175,6 +177,16 @@ sub run_clone {
         _checkout_tracking_branch($branch, $remote, $verbose, $secondary_branch);
       });
     }
+
+    # Finally add symlinks to default hooks
+    safe_cwd($module, sub {
+      print "* Enabling git hooks\n";
+      if (-d $HOOKS_DIR) {
+        opendir(my $hooks_dir, $HOOKS_DIR);
+        symlink "$HOOKS_DIR/$_", ".git/hooks/$_" while readdir $hooks_dir;
+        closedir $hooks_dir;
+      }
+    });
 
     return;
   });
