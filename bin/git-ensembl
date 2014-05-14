@@ -21,7 +21,8 @@ my $CFG_FILE = 'git-ensembl.cfg';
 # All default ensembl repos have this public root
 my $GITHUB_HTTPS_ROOT = 'https://github.com/Ensembl/';
 my $GITHUB_SSH_ROOT = 'ssh://git@github.com/Ensembl/';
-my $HOOKS_DIR;
+my $LOCAL_HOOKS_DIR = '.git/hooks';
+my $CENTRAL_HOOKS_DIR;
 
 BEGIN {
   use Cwd;
@@ -29,7 +30,7 @@ BEGIN {
   use File::Spec;
   my $dirname = dirname(Cwd::realpath(__FILE__));
   my $lib = File::Spec->catdir($dirname, File::Spec->updir(), 'lib');
-  $HOOKS_DIR = File::Spec->catdir($dirname, File::Spec->updir(), 'hooks');
+  $CENTRAL_HOOKS_DIR = File::Spec->catdir($dirname, File::Spec->updir(), 'hooks');
   if(-d $lib) {
     unshift(@INC, $lib);
   }
@@ -81,6 +82,9 @@ sub run {
     elsif($opts->{cmd}) {
       run_git_cmd($opts, $grp);
     }
+    elsif($opts->{hooks}) {
+      run_hooks($opts, $grp);
+    }
   }
   exit 0;
 }
@@ -117,6 +121,7 @@ sub parse_command_line {
     force_group
     force_module
     config|cfg=s
+    hooks=s
     verbose
     help|?
     man
@@ -178,15 +183,14 @@ sub run_clone {
       });
     }
 
-    # Finally add symlinks to default hooks
-    safe_cwd($module, sub {
+    # Finally enable hooks if hooks directory exists in ensembl-git-tools
+    if (-d $CENTRAL_HOOKS_DIR) {
       print "* Enabling git hooks\n";
-      if (-d $HOOKS_DIR) {
-        opendir(my $hooks_dir, $HOOKS_DIR);
-        symlink "$HOOKS_DIR/$_", ".git/hooks/$_" while readdir $hooks_dir;
-        closedir $hooks_dir;
-      }
-    });
+      _enable_hooks($module, 1);
+    }
+    else {
+      print STDERR "! Skipping enabling hooks as ensembl hooks directory is missing.\n";
+    }
 
     return;
   });
@@ -340,6 +344,53 @@ sub run_git_cmd {
     return;
   });
   return;
+}
+
+sub run_hooks {
+  my ($opts, $group) = @_;
+
+  if($opts->{hooks} !~ /^(en|dis)able$/) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => 'You must provide a flag (enable or disable) when using --hooks');
+  }
+
+  my $enable = $opts->{hooks} eq 'enable';
+
+  if ($enable && ! -d $CENTRAL_HOOKS_DIR) {
+    print STDERR "Could not enable git hooks as hooks directory is missing.\n";
+    return;
+  }
+
+  printf "* %s git hooks\n", $enable ? 'Enabling' : 'Disabling';
+
+  _loop_modules($opts, $group, sub {
+    my ($module) = @_;
+
+    _enable_hooks($module, $enable);
+
+    return;
+  });
+}
+
+sub _enable_hooks {
+  my ($module, $flag) = @_;
+  if ($flag) { #enable
+    safe_cwd($module, sub {
+      opendir(my $hooks_dir, $CENTRAL_HOOKS_DIR);
+      while(readdir $hooks_dir) {
+        symlink "$CENTRAL_HOOKS_DIR/$_", "$LOCAL_HOOKS_DIR/$_";
+      }
+      closedir $hooks_dir;
+    });
+  }
+  else { #disable
+    safe_cwd($module, sub {
+      opendir(my $hooks_dir, $LOCAL_HOOKS_DIR);
+      while(readdir $hooks_dir) {
+        unlink "$LOCAL_HOOKS_DIR/$_" if -l "$LOCAL_HOOKS_DIR/$_";
+      }
+      closedir $hooks_dir;
+    });
+  }
 }
 
 sub _loop_modules_and_chdir {
@@ -583,6 +634,7 @@ git ensembl [--clone [--name NAME] [--email EMAIL] [--depth DEPTH] [--branch BRA
             [--checkout --branch BRANCH --secondary_branch BRANCH] 
             [--pull] [--fetch] [--remote ORIGIN] [--dir DIR] [--groups] [--list] [--rebase]
             [--config CFG_LOCATION]
+            [--hooks enable/disable]
             [--force_group] [--force_module]
             [--cmd 'CMD']
             [-v] [-h] [-m] GROUPS_OR_MODULES
@@ -798,6 +850,10 @@ Force the interpritation of all additional arguments as modules not as groups
 =item B<--list>
 
 List all available groups
+
+=item B<--hooks>
+
+Enables or disables the available hooks
 
 =item B<--verbose>
 
