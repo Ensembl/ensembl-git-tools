@@ -17,12 +17,15 @@ limitations under the License.
 =cut
 
 package EnsEMBL::GitHub;
+use strict;
+use warnings;
 
 use parent qw/Exporter/;
 use Carp;
 use Cwd;
 use File::Spec;
 use HTTP::Tiny;
+use Fcntl ':mode';
 
 my $base_url = 'https://api.github.com';
 
@@ -37,12 +40,19 @@ eval {
 our @EXPORT = qw/
   rest_request
   parse_oauth_token
+  public_repositories
 /;
+
+sub public_repositories {
+  my ($organisation, $oauth) = @_;
+  my $json = rest_request('GET', "/orgs/${organisation}/repos?type=public", $oauth);
+  return [ sort map { $_->{name} } @{$json} ];
+}
 
 # Performs a REST request. You can specify the METHOD, extension URL, oauth token 
 # and body content
 sub rest_request {
-  my ($method, $url, $oauth, $content) = @_;
+  my ($method, $url, $oauth_token, $content) = @_;
   die 'No method specified' if ! $method;
   die 'No URL specified' if ! $url;
   my $http = HTTP::Tiny->new();
@@ -53,7 +63,10 @@ sub rest_request {
     $options->{content} = JSON::encode_json($content);
   }
   my $response = $http->request($method, $base_url.$url, $options);
-  die "Failed to process $method (${url})! STATUS: $response->{status} REASON: $response->{reason}\n" unless $response->{success};
+  if(! $response->{success}) {
+    use Data::Dumper; warn Dumper $response->{headers};
+    die "Failed to process $method (${url})! STATUS: $response->{status} REASON: $response->{reason}\n";
+  }
   return JSON::decode_json($response->{content});
 }
 
