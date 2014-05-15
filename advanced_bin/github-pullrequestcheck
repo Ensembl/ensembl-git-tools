@@ -42,6 +42,8 @@ sub run {
   
   my $duration_format = DateTime::Format::Duration->new(pattern => '%Y years, %m months, %e days');
   
+  my $msg = q{};
+  
   foreach my $repo (@{$repos}) {
     my $pulls = get_pull_requests($opts, $repo);
     my @old_pulls = 
@@ -50,7 +52,7 @@ sub run {
       @{$pulls};
     
     next unless @old_pulls;
-    print "* ${repo}: old pull requests found\n\n";
+    $msg .= "* ${repo}: old pull requests found\n\n";
     foreach my $pull (@old_pulls) {
       my $url = $pull->{html_url};
       my $title = $pull->{title};
@@ -59,17 +61,33 @@ sub run {
       my $age_of_pull = $duration_format->format_duration($now->subtract_datetime($recent_date));
       my $base = $pull->{base}->{label};
       
-      print "\t* USER : ${user}\n";
-      print "\t* TITLE: ${title}\n";
-      print "\t* AGE  : ${age_of_pull}\n";
-      print "\t* DATE : ${recent_date}\n";
-      print "\t* BASE : ${base}\n";
-      print "\t* URL  : ${url}\n";
+      $msg .= "\t* USER : ${user}\n";
+      $msg .= "\t* TITLE: ${title}\n";
+      $msg .= "\t* AGE  : ${age_of_pull}\n";
+      $msg .= "\t* DATE : ${recent_date}\n";
+      $msg .= "\t* BASE : ${base}\n";
+      $msg .= "\t* URL  : ${url}\n";
       
-      print "\n";
+      $msg .= "\n";
     }
-    print "\n----------------------------\n";
+    $msg .= "\n----------------------------\n";
   }
+  
+  if($msg) {
+    my $email = $opts->{email};
+    if($email) {
+      open my $sendmail, '|sendmail -t' or die "Cannot open sendmaill: $!";
+      print $sendmail "To: $email\n";
+      print $sendmail "Subject: Old Pull Requests Detected\n";
+      print $sendmail "Content-type: text/plain\n\n";
+      print $sendmail $msg;
+      close $sendmail;
+    }
+    else {
+      print $msg;
+    }
+  }
+  
   return;
 }
 
@@ -119,6 +137,7 @@ sub parse_command_line {
     oauth=s
     oauth_file=s
     organisation|organization=s
+    email=s
     help|?
     man
   /) or pod2usage(2);
@@ -143,7 +162,7 @@ github-pullrequestcheck - Check for old pull requests
 
 =head1 SYNOPSIS
 
-github-pullrequestcheck [--oauth OAUTH] [--oauth_file FILE] [--organisation ORG] [--repository REPO] [-h] [-m]
+github-pullrequestcheck [--oauth OAUTH] [--oauth_file FILE] [--organisation ORG] [--repository REPO] [--email usr@example.com] [-h] [-m]
 
 # Search for all open old pull requests with no oauth authentication
 
@@ -163,10 +182,11 @@ github-pullrequestcheck --oauth_file ~/.private/github-oauth
 
 # Using a different organisation
 
-github-switchbranch --organisation EnsemblGenomes
+github-pullrequestcheck --organisation EnsemblGenomes
 
 =head1 DESCRIPTION
 
+Performs a scan of the given organisation listing stale/old pull requests.
 
 All of this is done via GitHub's REST API and requires the generation of an oauth token for authentication purposes. You can do this via your account's setting page under Applications and generate a B<Personal Access Token>.
 
@@ -191,6 +211,10 @@ The GitHub organisation to list repositories for. Defaults to Ensembl
 =item B<--repository|repo>
 
 The repository to use. If not specified we use all public repositories
+
+=item B<--email>
+
+If specified we will send all output to an email address rather than to stdout. Requires a configured sendmail binary on your machine
 
 =item B<--help>
 
