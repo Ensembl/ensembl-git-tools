@@ -1,0 +1,206 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use DateTime::Format::ISO8601;
+
+BEGIN {
+  use Cwd;
+  use File::Basename;
+  use File::Spec;
+  my $dirname = dirname(Cwd::realpath(__FILE__));
+  my $lib = File::Spec->catdir($dirname, File::Spec->updir(), 'lib');
+  if(-d $lib) {
+    unshift(@INC, $lib);
+  }
+  else {
+    die "Cannot find the lib directory in the expected location $lib";
+  }
+};
+
+use EnsEMBL::GitHub qw/parse_oauth_token rest_request public_repositories/;
+
+use Pod::Usage;
+use Getopt::Long;
+use JSON;
+use HTTP::Tiny;
+use File::Spec;
+use DateTime;
+use DateTime::Format::ISO8601;
+use DateTime::Duration;
+use DateTime::Format::Duration;
+
+run();
+
+sub run {
+  my $opts = parse_command_line();
+  my $repos = get_repos($opts);
+  
+  my $now = DateTime->now();
+  my $delta = DateTime::Duration->new(days => 7);
+  my $cutoff = $now->subtract_duration($delta);
+  
+  my $duration_format = DateTime::Format::Duration->new(pattern => '%Y years, %m months, %e days');
+  
+  foreach my $repo (@{$repos}) {
+    my $pulls = get_pull_requests($opts, $repo);
+    my @old_pulls = 
+      sort {  DateTime->compare($a->{recent_date}, $b->{recent_date}) } 
+      grep { DateTime->compare($_->{recent_date}, $cutoff) < 0 } #filter anything which is as old or older than the cutoff
+      @{$pulls};
+    
+    next unless @old_pulls;
+    print "* ${repo}: old pull requests found\n\n";
+    foreach my $pull (@old_pulls) {
+      my $url = $pull->{html_url};
+      my $title = $pull->{title};
+      my $user = $pull->{user}->{login};
+      my $recent_date = $pull->{recent_date};
+      my $age_of_pull = $duration_format->format_duration($now->subtract_datetime($recent_date));
+      my $base = $pull->{base}->{label};
+      
+      print "\t* USER : ${user}\n";
+      print "\t* TITLE: ${title}\n";
+      print "\t* AGE  : ${age_of_pull}\n";
+      print "\t* DATE : ${recent_date}\n";
+      print "\t* BASE : ${base}\n";
+      print "\t* URL  : ${url}\n";
+      
+      print "\n";
+    }
+    print "\n----------------------------\n";
+  }
+  return;
+}
+
+sub get_repos {
+  my ($opts) = @_;
+  return $opts->{repository} if @{$opts->{repository}};
+  return public_repositories($opts->{organisation}, get_oauth_token($opts));
+}
+
+sub get_pull_requests {
+  my ($opts, $repo) = @_;
+  my $org = $opts->{organisation};
+  my $pulls = rest_request('GET', "/repos/${org}/${repo}/pulls?state=open", get_oauth_token($opts));
+  foreach my $pull (@{$pulls}) {
+    my @sorted_dates = 
+      sort { DateTime->compare($a, $b) } 
+      map { DateTime::Format::ISO8601->parse_datetime($_) }
+      grep { defined $_ }
+      map { $pull->{$_} } 
+      qw/created_at updated_at closed_at merged_at/;
+    $pull->{recent_date} = pop(@sorted_dates);
+  }
+  return $pulls;
+}
+
+sub get_oauth_token {
+  my ($opts) = @_;
+  return $opts->{oauth} if defined $opts->{oauth};
+  my $path = $opts->{oauth_file};
+  if($path && -f $path) {
+    my $token = parse_oauth_token($path);
+    return $opts->{oauth} = $token;
+  }
+  return;
+}
+
+sub parse_command_line {
+  my $opts = {
+    repository => [],
+    organisation => 'Ensembl',
+    help => 0,
+    man => 0
+  };
+
+  GetOptions($opts, qw/
+    repository|repo=s@
+    oauth=s
+    oauth_file=s
+    organisation|organization=s
+    help|?
+    man
+  /) or pod2usage(2);
+
+  pod2usage(1) if $opts->{help};
+  pod2usage(-exitval => 0, -verbose => 2) if $opts->{man};
+
+  my $oauth_file = $opts->{oauth_file};
+  if($oauth_file && ! -f $oauth_file) {
+    pod2usage(-exitval => 1, -verbose => 1, -msg => 'Cannot find the file specified in your --oauth_file param: '.$oauth_file); 
+  }
+
+  return $opts;
+}
+
+__END__
+=pod
+
+=head1 NAME
+
+github-pullrequestcheck - Check for old pull requests
+
+=head1 SYNOPSIS
+
+github-pullrequestcheck [--oauth OAUTH] [--oauth_file FILE] [--organisation ORG] [--repository REPO] [-h] [-m]
+
+# Search for all open old pull requests with no oauth authentication
+
+github-pullrequestcheck
+
+# Search for all open old pull requests in a single repo
+
+github-pullrequestcheck --repository ensembl
+
+# Search for all open old pull requests with oauth authentication
+
+github-pullrequestcheck --oauth XXXXXXXXXXXXXXXXXXXXXX
+
+# Using a OAuth file
+
+github-pullrequestcheck --oauth_file ~/.private/github-oauth
+
+# Using a different organisation
+
+github-switchbranch --organisation EnsemblGenomes
+
+=head1 DESCRIPTION
+
+
+All of this is done via GitHub's REST API and requires the generation of an oauth token for authentication purposes. You can do this via your account's setting page under Applications and generate a B<Personal Access Token>.
+
+The code can save an OAUTH token in a file and use this for authentication. To do so give it using the B<--oauth_file> option. The file must be readable only by the user (we are strict that access settings must be rw------- for user)
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--oauth>
+
+The OAuth token to use. More information is available from L<http://developer.github.com/v3/#authentication> and can be generated from your personal settings page.
+
+=item B<--oauth_file>
+
+The file which contains the OAuth key. Must be just the OAuth token (any whitespace will be removed). The file must be read/write only by the user and its containing directory must be read/write/execute by the user alone.
+
+=item B<--organisation|organization>
+
+The GitHub organisation to list repositories for. Defaults to Ensembl
+
+=item B<--repository|repo>
+
+The repository to use. If not specified we use all public repositories
+
+=item B<--help>
+
+Print the help information
+
+=item B<--man>
+
+Print a man page
+
+=back
+
+=cut
+
