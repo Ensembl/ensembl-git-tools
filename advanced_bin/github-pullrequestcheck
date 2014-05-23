@@ -39,6 +39,9 @@ sub run {
   my $now = DateTime->now();
   my $delta = DateTime::Duration->new(days => 7);
   my $cutoff = $now->subtract_duration($delta);
+
+  # When applying subtract_duration, updates $now object as well
+  $now = DateTime->now();
   
   my $duration_format = DateTime::Format::Duration->new(pattern => '%Y years, %m months, %e days');
   
