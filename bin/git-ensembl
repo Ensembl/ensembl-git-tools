@@ -38,8 +38,10 @@ use EnsEMBL::Git;
 # This normally lives in ~ensembl/git-ensembl.cfg or ~/git-ensembl.cfg
 my $CFG_FILE = 'git-ensembl.cfg';
 # All default ensembl repos have this public root
-my $GITHUB_HTTPS_ROOT = 'https://github.com/Ensembl/';
-my $GITHUB_SSH_ROOT = 'ssh://git@github.com/Ensembl/';
+my $GITHUB_HTTPS_ROOT    = 'https://github.com/Ensembl/';
+my $GITHUB_SSH_ROOT      = 'ssh://git@github.com/Ensembl/';
+my $EG_GITHUB_HTTPS_ROOT = 'https://github.com/EnsemblGenomes/';
+my $EG_GITHUB_SSH_ROOT   = 'ssh://git@github.com/EnsemblGenomes/';
 
 run();
 
@@ -506,6 +508,7 @@ sub _json {
 sub _default_modules {
   my ($opts) = @_;
   my $root = ($opts->{ssh}) ? $GITHUB_SSH_ROOT : $GITHUB_HTTPS_ROOT;
+  my $eg_root = ($opts->{ssh}) ? $EG_GITHUB_SSH_ROOT : $EG_GITHUB_HTTPS_ROOT;
   return {
     'ensembl'             => $root.'ensembl.git',
     'ensembl-compara'     => $root.'ensembl-compara.git',
@@ -528,6 +531,15 @@ sub _default_modules {
     'ensembl-internal-variation'   => $root.'ensembl-internal-variation.git',
     'ensembl-test'        => $root.'ensembl-test.git',
     'ensembl-git-tools'   => $root.'ensembl-git-tools.git',
+    'eg-web-common'       => $eg_root.'eg-web-common.git',
+    'eg-web-search'       => $eg_root.'eg-web-search.git',
+    'eg-web-bacteria'     => $eg_root.'eg-web-bacteria.git',
+    'eg-web-fungi'        => $eg_root.'eg-web-fungi.git',
+    'eg-web-metazoa'      => $eg_root.'eg-web-metazoa.git',
+    'eg-web-plants'       => $eg_root.'eg-web-plants.git',
+    'eg-web-protists'     => $eg_root.'eg-web-protists.git',
+    'eg-web-blast'        => $eg_root.'eg-web-blast.git',
+    'eg-rest'             => $eg_root.'eg-rest.git',
   }
 }
 
@@ -554,6 +566,26 @@ sub _default_groups {
     web => {
       desc => 'Libraries required to run the Ensembl website',
       modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode public-plugins ensembl-orm ensembl-tools/],
+    },
+    'eg-bacteria' => {
+      desc => 'Libraries required for Ensembl Genomes Bacteria',
+      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-bacteria/],
+    },
+    'eg-fungi' => {
+      desc => 'Libraries required for Ensembl Genomes Fungi',
+      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-fungi/],
+    },
+    'eg-metazoa' => {
+      desc => 'Libraries required for Ensembl Genomes Metazoa',
+      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-metazoa/],
+    },
+    'eg-plants' => {
+      desc => 'Libraries required for Ensembl Genomes Plants',
+      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-plants/],
+    },
+    'eg-protists' => {
+      desc => 'Libraries required for Ensembl Genomes Protists',
+      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-protists/],
     }
   };
 }
