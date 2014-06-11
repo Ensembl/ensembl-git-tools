@@ -523,6 +523,7 @@ sub _default_modules {
     'ensembl-hive'        => $root.'ensembl-hive.git',
     'ensembl-analysis'    => $root.'ensembl-analysis.git',
     'ensembl-pipeline'    => $root.'ensembl-pipeline.git',
+    'ensembl-killlist'    => $root.'ensembl-killlist.git',
     'ensembl-test'        => $root.'ensembl-test.git',
     'ensj-healthcheck'    => $root.'ensj-healthcheck.git',
     'WiggleTools'         => $root.'WiggleTools.git',
@@ -566,6 +567,10 @@ sub _default_groups {
     web => {
       desc => 'Libraries required to run the Ensembl website',
       modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode public-plugins ensembl-orm ensembl-tools/],
+    },
+    genebuild => {
+      desc => 'Libraries required to run the Ensembl Gene Annotation process',
+      modules => [qw/ensembl ensembl-analysis ensembl-pipeline ensembl-killlist ensembl-production/],
     },
     'eg-bacteria' => {
       desc => 'Libraries required for Ensembl Genomes Bacteria',
