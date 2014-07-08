@@ -1,0 +1,104 @@
+#!/bin/bash
+# Copyright [1999-2014] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#      http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This script is called by 'git commit' just before doing the actual commit
+# If the user has a config 'user.shared' as true, this script prevents commits
+# via the shared user and forces user to provide an actual git identity.
+# The provided git identity is saved (see git ensconfig) and reused within the
+# same session.
+# If the user is not shared, this script forces user to set his user.name and
+# user.email config
+
+# if user is not shared, enforce setting user.name and user.email
+if [ "$(git config --global user.shared)" != 'true' ] ; then
+
+  # get configured name and email
+  default_name=$(git config --get user.name)
+  default_email=$(git config --get user.email)
+
+  # Ask the user the fix this first
+  if [ -z "$default_name" ] || [ -z "$default_email" ] ; then
+    echo "Your name and email address have not been configured. Please configure them with the following command before continuing:
+    git config --global user.name \"Your Name\"
+    git config --global user.email you@example.com"
+    echo "If the user account is shared among multiple users, please add a configuration with the following command:
+    git config --global user.shared true"
+    exit 1
+  fi
+  exit 0
+fi
+
+# if git-ensconfig is not present
+ensconfig=$(git ensconfig --test 2> /dev/null)
+if [ -z "$ensconfig" ] ; then
+  echo 'Error: git-ensconfig is not available. Please contact your paladin.'
+  exit 1
+fi
+
+# get the previously used identity
+identity=$(git ensconfig --get)
+
+# if identity not configured yet
+if [ -z "$identity" ] ; then
+
+  # Ask for user identity
+  echo -n "Type in your git committer identity (eg. if your email registered with GitHub is foobar@ebi.ac.uk, type in 'foo' or 'foobar'): "
+  read shortname < /dev/tty
+
+  # Confirm with user, the full identity for the matching users
+  while read match ; do
+    match_found="yes"
+    while $(true) ; do
+      echo -n "Confirm details \"$match\" (y/n):"
+      read yn < /dev/tty
+      case $yn in
+        [Yy]* ) identity="$match" ; break ;;
+        [Nn]* ) break ;;
+        * ) echo "Please type 'y' for Yes or 'n' for No." ;;
+      esac
+    done
+    [ -n "$identity" ] && break
+  done < <(git rev-list --all -n100 -i --author="$shortname" --format="%aN <%aE>" | grep -v ^commit | grep -v '@users.noreply.github.com' | sort | uniq)
+
+  # if git rev-list didn't return any user name
+  if [ -z "$match_found" ] ; then
+    echo "Sorry, there is no history for author with pattern '$shortname'. If you think this is not correct, please contact your paladin."
+    exit 1
+  fi
+
+  # If none of the found users were valid
+  if [ -z "$identity" ] ; then
+    echo "Sorry, none of the the found users for pattern '$shortname' could be confirmed. If you think this is not correct, please contact your paladin."
+    exit 1
+  fi
+
+  # save the user details to the config file
+  git ensconfig --set "$identity"
+
+fi
+
+# modify the commit message file if no inline message was provided
+if [ -z "$2" ] ; then
+
+  # give precedence to the command line --author if provided
+  author=$(grep '# Author: ' "$1" | sed -r "s/^# Author:\s+//")
+  [ -z "$author" ] && author="$identity" || sed -i '4d' "$1" && sed -i '5d' "$1"
+
+  sed -i -r '/^# (Author|Committer):/d' "$1"
+  sed -i "4i #\n# The following committer and author identity will be forced on the\n# commit.\n#   (use \"git ensconfig --unset\" to remove identity)\n#\n# Author:    $author\n# Committer: $identity\n#" "$1"
+
+fi
+
+exit 0
