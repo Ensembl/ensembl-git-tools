@@ -43,7 +43,7 @@ sub run {
   # When applying subtract_duration, updates $now object as well
   $now = DateTime->now();
   
-  my $duration_format = DateTime::Format::Duration->new(pattern => '%Y years, %m months, %e days');
+  my $duration_format = DateTime::Format::Duration->new(pattern => '%Y year(s), %m month(s), %e day(s)');
   
   my $msg = q{};
   
@@ -64,12 +64,12 @@ sub run {
       my $age_of_pull = $duration_format->format_duration($now->subtract_datetime($recent_date));
       my $base = $pull->{base}->{label};
       
-      $msg .= "\t* USER : ${user}\n";
-      $msg .= "\t* TITLE: ${title}\n";
-      $msg .= "\t* AGE  : ${age_of_pull}\n";
-      $msg .= "\t* DATE : ${recent_date}\n";
-      $msg .= "\t* BASE : ${base}\n";
-      $msg .= "\t* URL  : ${url}\n";
+      $msg .= "\t* USER     : ${user}\n";
+      $msg .= "\t* TITLE    : ${title}\n";
+      $msg .= "\t* OVERDUE  : ${age_of_pull}\n";
+      $msg .= "\t* DATE     : ${recent_date}\n";
+      $msg .= "\t* BASE     : ${base}\n";
+      $msg .= "\t* URL      : ${url}\n";
       
       $msg .= "\n";
     }
@@ -118,6 +118,11 @@ sub get_pull_requests {
 
 sub get_oauth_token {
   my ($opts) = @_;
+  # If a user gave us a token path as the oauth command then deal with it
+  if(defined $opts->{oauth} && -f $opts->{oauth}) {
+    $opts->{oauth_file} = $opts->{oauth};
+    delete $opts->{oauth};
+  }
   return $opts->{oauth} if defined $opts->{oauth};
   my $path = $opts->{oauth_file};
   if($path && -f $path) {
