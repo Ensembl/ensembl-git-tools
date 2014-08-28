@@ -550,6 +550,8 @@ sub _user_cfg {
 sub _central_cfg {
   my ($opts) = @_;
   my $ens_home = (getpwnam('ensembl'))[7];
+  # If ens_home was undefined then we don't have an ensembl user so skip
+  return {} if ! defined $ens_home;
   return _json(File::Spec->catfile($ens_home, $CFG_FILE));
 }
 
