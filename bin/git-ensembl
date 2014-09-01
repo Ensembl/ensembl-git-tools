@@ -606,7 +606,9 @@ sub _default_modules {
     'eg-web-plants'       => $eg_root.'eg-web-plants.git',
     'eg-web-protists'     => $eg_root.'eg-web-protists.git',
     'eg-web-blast'        => $eg_root.'eg-web-blast.git',
+    'eg-web-testsuite'    => $eg_root.'eg-web-testsuite.git',
     'eg-rest'             => $eg_root.'eg-rest.git',
+    'ensemblgenomes-api'  => $eg_root.'ensemblgenomes-api.git',
   }
 }
 
@@ -640,24 +642,28 @@ sub _default_groups {
     },
     'eg-bacteria' => {
       desc => 'Libraries required for Ensembl Genomes Bacteria',
-      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-bacteria/],
+      modules => [qw/eg-web-common eg-web-search eg-web-blast ensemblgenomes-api eg-web-bacteria/],
     },
     'eg-fungi' => {
       desc => 'Libraries required for Ensembl Genomes Fungi',
-      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-fungi/],
+      modules => [qw/eg-web-common eg-web-search eg-web-blast ensemblgenomes-api eg-web-fungi/],
     },
     'eg-metazoa' => {
       desc => 'Libraries required for Ensembl Genomes Metazoa',
-      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-metazoa/],
+      modules => [qw/eg-web-common eg-web-search eg-web-blast ensemblgenomes-api eg-web-metazoa/],
     },
     'eg-plants' => {
       desc => 'Libraries required for Ensembl Genomes Plants',
-      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-plants/],
+      modules => [qw/eg-web-common eg-web-search eg-web-blast ensemblgenomes-api eg-web-plants/],
     },
     'eg-protists' => {
       desc => 'Libraries required for Ensembl Genomes Protists',
-      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-protists/],
-    }
+      modules => [qw/eg-web-common eg-web-search eg-web-blast ensemblgenomes-api eg-web-protists/],
+    },
+    'eg-all' => {
+      desc => 'All Ensembl Genomes libraries',
+      modules => [qw/eg-web-common eg-web-search eg-web-blast ensemblgenomes-api eg-web-testsuite eg-web-bacteria eg-web-fungi eg-web-metazoa eg-web-plants eg-web-protists/],
+    },
   };
 }
 
