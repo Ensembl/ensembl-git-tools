@@ -26,6 +26,7 @@ identity=$(git ensconfig --get)
 if [ -n "$identity" ] ; then
   name=$(echo "$identity" | cut -d '<' -f 1 | sed 's/\s$//')
   email=$(echo "$identity" | cut -d '<' -f 2 | sed 's/>$//')
+  stash=$(git stash | grep "^Saved" | wc -l);
 
   git filter-branch -f --env-filter "
     if [ \"\$GIT_AUTHOR_EMAIL\" == \"\$GIT_COMMITTER_EMAIL\" ] ; then
@@ -34,7 +35,11 @@ if [ -n "$identity" ] ; then
     fi
     export GIT_COMMITTER_EMAIL=\"$email\"
     export GIT_COMMITTER_NAME=\"$name\"
-  " --  --max-count=1 --all > /dev/null 2>&1
+  " --  --max-count=1 HEAD > /dev/null
+
+  if [ "$stash" == "1" ] ; then
+    git stash pop > /dev/null
+  fi
 
   git log -n1 --format="%CgreenAuthor:%Creset    %aN <%aE>%n%CgreenCommitter:%Creset %cN <%cE>"
 
