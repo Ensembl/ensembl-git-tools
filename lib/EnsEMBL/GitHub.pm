@@ -20,7 +20,7 @@ package EnsEMBL::GitHub;
 use strict;
 use warnings;
 
-use parent qw/Exporter/;
+use base qw/Exporter/;
 use Carp;
 use Cwd;
 use File::Spec;

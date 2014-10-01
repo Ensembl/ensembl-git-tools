@@ -18,7 +18,10 @@ limitations under the License.
 
 package EnsEMBL::Git;
 
-use parent qw/Exporter/;
+use strict;
+use warnings;
+
+use base qw/Exporter/;
 use Carp;
 use Cwd;
 use File::Spec;
@@ -304,7 +307,7 @@ sub checkout_tracking {
   }
   if($exitcode) {
     print STDERR 
-      "Could not switch $GIT_DIR to branch '${branch}' using options ${args}.\n", 
+      "Could not switch to branch '${branch}' using options ${args}.\n", 
       'Command output:', "\n",
       $output,"\n";
     return 0;
