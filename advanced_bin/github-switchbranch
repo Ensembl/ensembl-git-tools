@@ -66,7 +66,7 @@ sub default_branch {
   my $branch = $opts->{branch};
   my $organisation = $opts->{organisation};
   print "*   Checking for default_branch against user branch $branch\n";
-  my $json = get_json($opts, 'GET', "/repos/${organisation}/${repo}");
+  my $json = get_json($opts, 'GET', "/repos/${organisation}/${repo};per_page=100");
   return 1 if $json->{default_branch} eq $branch;
   return 0;
 }
@@ -76,7 +76,7 @@ sub has_branch {
   my $branch = $opts->{branch};
   my $organisation = $opts->{organisation};
   print "*   Checking if $repo has branch $branch\n";
-  my $json = get_json($opts, 'GET', "/repos/${organisation}/${repo}/branches");
+  my $json = get_json($opts, 'GET', "/repos/${organisation}/${repo}/branches?per_page=100;rel='last'");
   foreach my $branch_spec (@{$json}) {
     if($branch_spec->{name} eq $branch) {
       return 1;
