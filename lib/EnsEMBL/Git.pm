@@ -238,10 +238,10 @@ sub current_branch {
 # We request both refs SHA-1 codes and compare. If they are the 
 # same they will have the same hash
 sub is_origin_uptodate {
-  my ($branch, $remote) = @_;
+  my ($branch, $remote, $nofetch) = @_;
   die "No branch given" unless $branch;
   $remote ||= 'origin';
-  fetch(undef, undef, $remote);
+  fetch(undef, undef, $remote) unless $nofetch;
   my $local_hash  = rev_parse($branch);
   my $remote_hash = rev_parse("$remote/$branch");
   return ($local_hash eq $remote_hash) ? 1 : 0;
@@ -251,10 +251,10 @@ sub is_origin_uptodate {
 # tracking branch. This is done by taking the remote branch hash
 # and see if this is the same as the merge-point of local and remote
 sub can_fastforward_merge {
-  my ($branch, $remote) = @_;
+  my ($branch, $remote, $nofetch) = @_;
   die "No branch given" unless $branch;
   $remote ||= 'origin';
-  fetch(undef, undef, $remote);
+  fetch(undef, undef, $remote) unless $nofetch;
   my $remote_hash = rev_parse("$remote/$branch");
   my ($output) = cmd("git merge-base $remote/$branch $branch");
   chomp $output;
