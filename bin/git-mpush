@@ -1,0 +1,381 @@
+#!/usr/bin/env perl
+# Copyright [1999-2014] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#      http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This extra command provides a way to push commits to master and release branch at once
+# If possible, the commits are made on one branch and then fast-forwarded to the other,
+# if not, a new branch is created, all the commits are moved to that branch and then the
+# branch is merged into both master and release branch
+
+use strict;
+use warnings;
+
+BEGIN {
+  use Cwd;
+  use File::Basename;
+  use File::Spec;
+  my $dirname = dirname(Cwd::realpath(__FILE__));
+  my $lib = File::Spec->catdir($dirname, File::Spec->updir(), 'lib');
+  if(-d $lib) {
+    unshift(@INC, $lib);
+  }
+  else {
+    error("Cannot find the lib directory in the expected location $lib");
+  }
+};
+
+use EnsEMBL::Git;
+use Getopt::Long;
+
+run();
+
+sub run {
+  my $options         = parse_command_line();
+  my $remote          = $options->{'remote'};
+  my $current_branch  = current_branch();
+  my $master_branch   = 'master';
+  my $release_branch;
+
+  # Has to be GIT repo
+  if (!is_git_repo()) {
+    error("Not a git repository.");
+  }
+
+  # We don't do anything while staged or modified files are in the dir
+  if (!is_tree_clean()) {
+    exit 1;
+  }
+
+  # deteched head?
+  if (!$current_branch) {
+    error("HEAD is currently not on any branch. If you are in middle of a rebase or merge, please fix or abort it before continuing.");
+  }
+
+  # ff-only and no-ff are not compatible
+  if ($options->{'ff-only'} && $options->{'no-ff'}) {
+    error('Please provide only one out of these two options: --ff-only, --no-ff');
+  }
+
+  # Find out the release branch to which the commits should be pushed
+  if (!$options->{'release'}) {
+    my $rel = $current_branch =~ s/^release\///r;
+
+    if ($rel =~ /^\d+$/) {
+      $options->{'release'} = $rel;
+    } else {
+      error("No release number provided.\nEither provide a release number, or checkout on the release branch before running this command.");
+      exit 1;
+    }
+  }
+
+  $release_branch = "release/$options->{'release'}";
+
+  # Update remote
+  info('Updating remote...');
+  fetch();
+
+  # Release branch exists?
+  if (!branch_exists($release_branch)) {
+    error("Release branch $release_branch does not exist.");
+  }
+
+  # Release branch exists on remote?
+  if (!branch_exists($release_branch, $remote)) {
+    error("Release branch $release_branch is not a tracking branch.");
+  }
+
+  # Either of the branches is behind or diverged, prompt user for a pull --rebase on that branch
+  for ($master_branch, $release_branch) {
+    if (!can_fastforward_merge($_, $remote, 1)) {
+      error("Branch '$_' is either behind or diverged from remote. Please do a `git pull --rebase` on '$_' before continuing.");
+    }
+  }
+
+  # Find out the branch that contains commits that need to be pushed
+  my $branch_with_commits = {};
+  for ($master_branch, $release_branch) {
+    if (!is_origin_uptodate($_, $remote, 1)) {
+      $branch_with_commits->{$_} = commits_list("$remote/$_", $_);
+    }
+  }
+
+  # If both branches have unpushed commits, we don't try to be over-intelligent and move commits around - leave that on to the user
+  if (keys %$branch_with_commits == 2) {
+    error("Both '$master_branch' and '$release_branch' branches have commits to push. Please move these commits to one branch before you continue.");
+  }
+
+  # save pointers to the slower and the faster branch
+  my ($slower_branch, $faster_branch) = sort { exists $branch_with_commits->{$a} ? 1 : -1 } $master_branch, $release_branch;
+
+  # If remote branches are actually at same point (and user doesn't mind fast-forwarding), fast-forward the slower local branch to the other
+  if (!$options->{'no-ff'} && rev_parse("$remote/$release_branch") eq rev_parse("$remote/$master_branch")) {
+
+    # checkout the slower branch
+    if ($current_branch ne $slower_branch) {
+      switch_branch($slower_branch);
+    }
+
+    # fast-forward merge the faster branch to the slower one
+    info("Attempting to fast-forward branch '$slower_branch' to '$faster_branch'");
+    if (!ff_merge($faster_branch)) {
+      error("Could not fast-forward branch '$slower_branch' to '$faster_branch'.");
+    }
+
+    info("Local branches '$master_branch' and '$release_branch' are at the same point now.");
+
+    # Finally push both branches
+    my $failed_push = {};
+    for ($master_branch, $release_branch) {
+      if (!push_branch($remote, $_, $options->{'no-push'})) {
+        $failed_push->{$_} = 1;
+      }
+    }
+
+    if ($current_branch ne $slower_branch) {
+      switch_branch($current_branch, 1);
+    }
+
+    # Throw error if push failed
+    if (keys %$failed_push) {
+      error(join "\n", 'Following branch(es) could not be push to remote:', keys %$failed_push);
+    } else {
+      if (@{$branch_with_commits->{$faster_branch}}) {
+        info(join "\n", 'DONE: Successfully updated both branches with following commits:', @{$branch_with_commits->{$faster_branch}});
+      } else {
+        info("DONE: Nothing to push");
+      }
+      exit 0;
+    }
+  }
+
+  # past this point, we don't have any fast-forward only solution
+  if ($options->{'ff-only'}) {
+    error("Request for 'fast-forward only' can not be fulfilled.");
+  }
+
+  # create a new branch to carry the common commits unless already existing
+  my $shared_branch = "$options->{'sharedbranch'}/$options->{'release'}";
+  my $shared_branchpoint;
+  if (!branch_exists($shared_branch)) {
+    info("Creating new branch '$shared_branch'");
+    ($shared_branchpoint) = cmd("git merge-base $master_branch $release_branch");
+    chomp $shared_branchpoint;
+    if (!branch($shared_branch, undef, $shared_branchpoint)) {
+      error("Could not create branch '$shared_branch' from point '$shared_branchpoint'.");
+    }
+  }
+
+  # switch to the shared branch
+  switch_branch($shared_branch);
+
+  # update the local shared branch
+  if (branch_exists($shared_branch, $remote)) {
+    if (can_fastforward_merge($shared_branch, $remote, 1)) {
+      info("Updating branch $shared_branch");
+      if (!ff_merge("$remote/$shared_branch")) {
+        error("Branch '$shared_branch' could not be updated.");
+      }
+    } else {
+      error("Branch '$shared_branch' is either behind or diverged from remote. Please do a `git pull --rebase` on '$shared_branch' before continuing.");
+    }
+  }
+
+  # create a temp branch to move the commits
+  my $temp_branch = "mpush_".random_str();
+  info("Creating a temporary branch '$temp_branch' to graft new commits onto it.");
+  if (!branch($temp_branch, undef, $faster_branch)) {
+    error("Could not create temporary branch '$temp_branch'.");
+  }
+  switch_branch($temp_branch);
+
+  # Graft the temp branch on the shared branch
+  info("Grafting new commits to branch '$temp_branch'.");
+  if (!cmd_ok("git rebase --onto $shared_branch $remote/$faster_branch $temp_branch")) {
+    info("Action failed, cleaning up");
+    switch_branch($current_branch, 1);
+    cmd("git branch -D $temp_branch");
+    error("Could not graft local commits from branch '$faster_branch' to the temporary branch '$temp_branch'.");
+  }
+
+  # Fast-forward shared branch to temp branch - this will graft all the new commits to shared branch
+  info("Moving shared branch '$shared_branch' pointer to temporary branch '$temp_branch' to update the shared branch with new commits.");
+  switch_branch($shared_branch);
+  if (!ff_merge($temp_branch)) {
+    info("Action failed, cleaning up");
+    if (checkout($temp_branch)) {
+      cmd(sprintf 'git reset %s --hard', rev_parse($shared_branch));
+    }
+    switch_branch($current_branch, 1);
+    cmd("git branch -D $temp_branch");
+    error("Could not fast-forward branch '$shared_branch' to the temporary branch '$temp_branch'.");
+  }
+
+  # get the list of commits that will pushed
+  my $updated_commits = commits_list($shared_branchpoint || "$remote/$shared_branch", $shared_branch);
+
+  # Reset faster branch to its origin
+  info("Removing redundant commits from '$faster_branch'");
+  {
+    my ($output, $exitcode) = cmd("git checkout -B $faster_branch $remote/$faster_branch");
+    print $output if !$exitcode;
+  }
+
+  # Delete the temporary branch
+  info("Deleting temporary branch '$temp_branch'");
+  cmd("git branch -D $temp_branch");
+
+  # push the shared branch
+  info("Pushing shared branch '$shared_branch' to remote") unless $options->{'no-push'};
+  if (push_branch($remote, $shared_branch, $options->{'no-push'})) {
+
+    # set upstream if shared branch is just created now
+    if (!$options->{'no-push'} && $shared_branchpoint) {
+      my ($out) = cmd("git branch --set-upstream $shared_branch $remote/$shared_branch");
+      print $out;
+    }
+  } else {
+    error("Could not push shared branch '$shared_branch' to remote.");
+  }
+  info("Done pushing changes to remote shared branch '$shared_branch'") unless $options->{'no-push'};
+
+  # if merge not required, no need to go further
+  if ($options->{'no-merge'}) {
+    switch_branch($current_branch, 1);
+    info("Shared branch '$shared_branch' not merged into branches '$master_branch' and '$release_branch' as requested.");
+    exit 0;
+  }
+
+  # Now merge the new branch into both master and the release branch
+  my $failed_push = {};
+  for ($master_branch, $release_branch) {
+    if (current_branch() ne $_) {
+      switch_branch($_);
+    }
+
+    # do the non ff merge
+    info("Merging fixes from '$shared_branch' to '$_'");
+    if (!no_ff_merge($shared_branch, "Merging $shared_branch to $_")) {
+      error("Failed to merge branch '$shared_branch' to '$_'.");
+    }
+
+    # push the branch
+    $failed_push->{$_} = 1 unless push_branch($remote, $_, $options->{'no-push'});
+  }
+
+  # back to the original branch
+  switch_branch($current_branch, 1);
+
+  # Throw error if push failed
+  if (keys %$failed_push) {
+    error(join "\n", 'Following branch(es) could not be push to remote:', keys %$failed_push);
+  } else {
+    if (@{$updated_commits}) {
+      info(join "\n", 'DONE: Successfully updated both branches with following commits:', @{$updated_commits});
+    } else {
+      info("DONE: Nothing to push");
+    }
+    exit 0;
+  }
+}
+
+sub push_branch {
+  my ($remote, $branch, $nopush) = @_;
+  if ($nopush) {
+    info("Not pushing branch '$branch' as requested.");
+    return 1;
+  } else {
+    info("Pushing branch '$branch'");
+    return git_push($remote, $branch);
+  }
+}
+
+sub commits_list {
+  my ($point_old, $point_new) = @_;
+  my ($commits, $error) = cmd("git log $point_old..$point_new --oneline");
+
+  if ($error) {
+    error("Could not get a list of commits to be pushed (failed to run `git log $point_old..$point_new --oneline`)");
+  }
+
+  return [ grep $_, split "\n", $commits ];
+}
+
+sub switch_branch {
+  my ($branch, $warning_only) = @_;
+  info("Switching to branch '$branch'");
+  if (!checkout($branch)) {
+    $warning_only ? error("Could not switch to branch '$branch'.") : info("WARNING: Could not switch to branch '$branch'.");
+  }
+}
+
+sub random_str {
+  my @chars = "a".."z";
+  my $string;
+  $string .= $chars[rand @chars] for 1..8;
+  return $string;
+}
+
+sub parse_command_line {
+  my $options = {
+    'release'       => 0,
+    'ff-only'       => 0,
+    'no-ff'         => 0,
+    'no-merge'      => 0,
+    'no-push'       => 0,
+    'sharedbranch'  => 'postreleasefix',
+    'remote'        => 'origin',
+    'help'          => 0
+  };
+
+  GetOptions($options, qw(
+    release=i
+    sharedbranch=s
+    remote=s
+    ff-only!
+    no-ff!
+    no-merge!
+    no-push!
+    help|?
+  )) or usage();
+
+  usage() if $options->{'help'};
+
+  return $options;
+}
+
+sub error {
+  my $message = shift;
+  print STDERR "ERROR: $message\n";
+  exit 1;
+}
+
+sub info {
+  my $message = shift;
+  print "$message\n";
+}
+
+sub usage {
+  print "usage: git mpush [options]
+    This command will push the un-pushed commits to master and the specified release branch at once.
+      If both the branchs are at a same point, the commits are made on master and then release branch is fast-forwarded to it,
+      if not, then a new branch postreleasefix/\$release_num is created and the commits are made to that branch before merging that branch to both master and the release branch.
+        --release <release> Release branch number to which commit is to be pushed (this is not needed if already on release branch)
+        --sharedbranch      Prefix for the shared branch (defaults to 'postreleasefix')
+        --ff-only           Push only if master and release branch are on a same point.
+        --no-ff             Create a third branch even if it was possible to fast-forward one branch to the other.
+        --no-merge          Push the commits to the postrelease branch but do not merge it back to master and release.
+        --no-push           Stop when making the actual push to remote.
+        --remote            Remote name (defaults to 'origin')\n";
+  exit 0;
+}
