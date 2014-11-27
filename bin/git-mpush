@@ -69,7 +69,7 @@ sub run {
 
   # Find out the release branch to which the commits should be pushed
   if (!$options->{'release'}) {
-    my $rel = $current_branch =~ s/^release\///r;
+    (my $rel = $current_branch) =~ s/^release\///;
 
     if ($rel =~ /^\d+$/) {
       $options->{'release'} = $rel;
