@@ -95,11 +95,9 @@ sub run {
     error("Release branch $release_branch is not a tracking branch.");
   }
 
-  # Either of the branches is behind or diverged, prompt user for a pull --rebase on that branch
+  # Update both local branches to origin if possible
   for ($master_branch, $release_branch) {
-    if (!can_fastforward_merge($_, $remote, 1)) {
-      error("Branch '$_' is either behind or diverged from remote. Please do a `git pull --rebase` on '$_' before continuing.");
-    }
+    update_branch($_, $remote);
   }
 
   # Find out the branch that contains commits that need to be pushed
@@ -177,14 +175,7 @@ sub run {
 
   # update the local shared branch
   if (branch_exists($shared_branch, $remote)) {
-    if (can_fastforward_merge($shared_branch, $remote, 1)) {
-      info("Updating branch $shared_branch");
-      if (!ff_merge("$remote/$shared_branch")) {
-        error("Branch '$shared_branch' could not be updated.");
-      }
-    } else {
-      error("Branch '$shared_branch' is either behind or diverged from remote. Please do a `git pull --rebase` on '$shared_branch' before continuing.");
-    }
+    update_branch($shared_branch, $remote);
   }
 
   # create a temp branch to move the commits
@@ -280,6 +271,25 @@ sub run {
       info("DONE: Nothing to push");
     }
     exit 0;
+  }
+}
+
+sub update_branch {
+  my ($branch, $remote) = @_;
+
+  my $current_branch = current_branch();
+
+  if (!can_fastforward_merge($branch, $remote, 1)) { # local is behind or diverged (can_fastforward_merge return true if local branch is ahead of remote)
+
+    info("Updating branch '$branch'");
+    switch_branch($branch);
+
+    if (!ff_merge("$remote/$branch")) { # this will fail if branches are diverged
+      switch_branch($current_branch, 1);
+      error("Branch '$branch' is diverged from remote. Please do a `git pull --rebase` on '$branch' before continuing.");
+    }
+
+    switch_branch($current_branch);
   }
 }
 
