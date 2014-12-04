@@ -122,9 +122,7 @@ sub run {
   if (!$options->{'no-ff'} && rev_parse("$remote/$release_branch") eq rev_parse("$remote/$master_branch")) {
 
     # checkout the slower branch
-    if ($current_branch ne $slower_branch) {
-      switch_branch($slower_branch);
-    }
+    switch_branch($slower_branch);
 
     # fast-forward merge the faster branch to the slower one
     info("Attempting to fast-forward branch '$slower_branch' to '$faster_branch'");
@@ -142,9 +140,7 @@ sub run {
       }
     }
 
-    if ($current_branch ne $slower_branch) {
-      switch_branch($current_branch, 1);
-    }
+    switch_branch($current_branch, 1);
 
     # Throw error if push failed
     if (keys %$failed_push) {
@@ -259,9 +255,7 @@ sub run {
   # Now merge the new branch into both master and the release branch
   my $failed_push = {};
   for ($master_branch, $release_branch) {
-    if (current_branch() ne $_) {
-      switch_branch($_);
-    }
+    switch_branch($_);
 
     # do the non ff merge
     info("Merging fixes from '$shared_branch' to '$_'");
@@ -313,9 +307,11 @@ sub commits_list {
 
 sub switch_branch {
   my ($branch, $warning_only) = @_;
-  info("Switching to branch '$branch'");
-  if (!checkout($branch)) {
-    $warning_only ? error("Could not switch to branch '$branch'.") : info("WARNING: Could not switch to branch '$branch'.");
+  if ($branch ne current_branch()) {
+    info("Switching to branch '$branch'");
+    if (!checkout($branch)) {
+      $warning_only ? info("WARNING: Could not switch to branch '$branch'.") : error("Could not switch to branch '$branch'.");
+    }
   }
 }
 
