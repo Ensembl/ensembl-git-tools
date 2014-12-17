@@ -56,8 +56,8 @@ sub get_repos {
     return $opts->{repository};
   }
   my $organisation = $opts->{organisation};
-  print "* Fetching all public repositories from GitHub for $organisation\n";
-  my $json = get_json($opts, 'GET', "/orgs/${organisation}/repos?type=public;per_page=100");
+  print "* Fetching all repositories from GitHub for $organisation\n";
+  my $json = get_json($opts, 'GET', "/orgs/${organisation}/repos?type=all;per_page=100");
   return [ sort map { $_->{name} } @{$json} ];
 }
 
