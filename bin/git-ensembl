@@ -631,7 +631,7 @@ sub _default_groups {
     },
     rest => {
       desc => 'Libraries required to run the Ensembl REST API',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-rest/],
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-rest ensembl-io/],
     },
     web => {
       desc => 'Libraries required to run the Ensembl website',
