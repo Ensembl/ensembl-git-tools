@@ -587,6 +587,8 @@ sub _default_modules {
     'ensembl-orm'         => $root.'ensembl-orm.git',
     'public-plugins'      => $root.'public-plugins.git',
     'sanger-plugins'      => $root.'sanger-plugins.git',
+    'biomart-perl'        => $root.'biomart-perl.git',
+    'web-utils'           => $root.'web-utils.git',
     'ensembl-hive'        => $root.'ensembl-hive.git',
     'ensembl-analysis'    => $root.'ensembl-analysis.git',
     'ensembl-pipeline'    => $root.'ensembl-pipeline.git',
