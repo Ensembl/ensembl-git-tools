@@ -41,12 +41,40 @@ our @EXPORT = qw/
   rest_request
   parse_oauth_token
   public_repositories
+  paginated_rest_request
 /;
 
 sub public_repositories {
   my ($organisation, $oauth) = @_;
-  my $json = rest_request('GET', "/orgs/${organisation}/repos?type=public", $oauth);
+  my $json = paginated_rest_request('GET', "/orgs/${organisation}/repos?type=public", $oauth);
   return [ sort map { $_->{name} } @{$json} ];
+}
+
+# GitHub provides paginated items in sets of 30.
+# This method get the maximum number of pages,
+# loop through each pages
+# and return the complete json object back.
+sub paginated_rest_request {
+  my ($method, $url, $oauth_token) = @_;  
+  my ($json, $headers) = rest_request($method, $url, $oauth_token);
+  my ($json_page, $headers_page);
+  if ($headers->{link}){
+    my @links = split(/,/, $headers->{link});
+    foreach my $link (@links) {
+      if ($link =~ m/.+page=([0-9])>;\srel=\"(last)\"/) {  
+        for (my $page=2; $page<=$1; $page++) {
+          if ($url =~ m/\?/) {
+            ($json_page, $headers_page) = rest_request($method, $url."&page=${page}", $oauth_token);
+          }
+          else {
+            ($json_page, $headers_page) = rest_request($method, $url."?page=${page}", $oauth_token);
+          }
+          push (@{$json}, @{$json_page});
+        }
+      }
+    }
+  }
+  return $json;
 }
 
 # Performs a REST request. You can specify the METHOD, extension URL, oauth token 
@@ -67,7 +95,13 @@ sub rest_request {
     use Data::Dumper; warn Dumper $response->{headers};
     die "Failed to process $method (${url})! STATUS: $response->{status} REASON: $response->{reason}\n";
   }
-  return JSON::decode_json($response->{content});
+  my $decoded_json = JSON::decode_json($response->{content});
+  if(wantarray) {
+    return ($decoded_json, $response->{headers});
+  }
+  else {
+    return $decoded_json;
+  }
 }
 
 # Pulls out the oauth token held in the specified file. It 

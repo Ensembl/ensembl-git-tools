@@ -18,7 +18,7 @@ BEGIN {
 };
 
 use EnsEMBL::Git qw/bare_clone fetch/;
-use EnsEMBL::GitHub qw/parse_oauth_token rest_request/;
+use EnsEMBL::GitHub qw/parse_oauth_token rest_request paginated_rest_request/;
 use Pod::Usage;
 use Getopt::Long;
 
@@ -63,7 +63,7 @@ sub get_repos {
   my ($opts) = @_;
   my $organisation = $opts->{organisation};
   my $oauth_token = get_oauth_token($opts);
-  my $repos = rest_request('GET', "/orgs/${organisation}/repos", $oauth_token);
+  my $repos = paginated_rest_request('GET', "/orgs/${organisation}/repos", $oauth_token);
   return $repos unless @{$opts->{repository}};
   my %lookup = map { $_, 1 } @{$opts->{repository}};
   return [ grep { $lookup{$_->{name}} } @{$repos} ];

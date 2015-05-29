@@ -18,7 +18,7 @@ BEGIN {
   }
 };
 
-use EnsEMBL::GitHub qw/parse_oauth_token rest_request public_repositories/;
+use EnsEMBL::GitHub qw/parse_oauth_token rest_request paginated_rest_request public_repositories/;
 
 use Pod::Usage;
 use Getopt::Long;
@@ -103,7 +103,7 @@ sub get_repos {
 sub get_pull_requests {
   my ($opts, $repo) = @_;
   my $org = $opts->{organisation};
-  my $pulls = rest_request('GET', "/repos/${org}/${repo}/pulls?state=open", get_oauth_token($opts));
+  my $pulls = paginated_rest_request('GET', "/repos/${org}/${repo}/pulls?state=open", get_oauth_token($opts));
   foreach my $pull (@{$pulls}) {
     my @sorted_dates = 
       sort { DateTime->compare($a, $b) } 

@@ -17,7 +17,7 @@ BEGIN {
   }
 };
 
-use EnsEMBL::GitHub qw/parse_oauth_token rest_request/;
+use EnsEMBL::GitHub qw/parse_oauth_token rest_request paginated_rest_request/;
 
 use Pod::Usage;
 use Getopt::Long;
@@ -57,7 +57,7 @@ sub get_repos {
   }
   my $organisation = $opts->{organisation};
   print "* Fetching all repositories from GitHub for $organisation\n";
-  my $json = get_json($opts, 'GET', "/orgs/${organisation}/repos?type=all;per_page=100");
+  my $json = get_json($opts, 'GET', "/orgs/${organisation}/repos?type=all");
   return [ sort map { $_->{name} } @{$json} ];
 }
 
@@ -76,7 +76,7 @@ sub has_branch {
   my $branch = $opts->{branch};
   my $organisation = $opts->{organisation};
   print "*   Checking if $repo has branch $branch\n";
-  my $json = get_json($opts, 'GET', "/repos/${organisation}/${repo}/branches?per_page=100;rel='last'");
+  my $json = get_json($opts, 'GET', "/repos/${organisation}/${repo}/branches");
   foreach my $branch_spec (@{$json}) {
     if($branch_spec->{name} eq $branch) {
       return 1;
@@ -103,7 +103,7 @@ sub update_branch {
 sub get_json {
   my ($opts, $method, $url, $content) = @_;
   my $token = get_oauth_token($opts);
-  return rest_request($method, $url, $token, $content);
+  return paginated_rest_request($method, $url, $token, $content);
 }
 
 sub get_oauth_token {
