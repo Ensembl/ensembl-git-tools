@@ -621,7 +621,7 @@ sub _default_groups {
   return {
     api => {
       desc => 'API module set used for querying and processing Ensembl data',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen/],
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-io/],
     },
     tools => {
       desc => 'Libraries required to run Ensembl tools such as the VEP',
