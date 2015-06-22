@@ -41,7 +41,7 @@ pushd $tmpdir >& /dev/null
 
 # Cleanup
 echo 'Cleaning up clones'
-for d in ensembl ensembl-compara ensembl-variation ensembl-funcgen; do
+for d in ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-io ensembl-tools; do
   rm -rf $d/modules/t
   rm -rf $d/.git
 done
