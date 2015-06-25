@@ -223,7 +223,6 @@ sub run {
   cmd("git branch -D $temp_branch");
 
   # push the shared branch
-  info("Pushing shared branch '$shared_branch' to remote") unless $options->{'no-push'};
   if (push_branch($remote, $shared_branch, $options->{'no-push'})) {
 
     # set upstream if shared branch is just created now
@@ -234,7 +233,6 @@ sub run {
   } else {
     error("Could not push shared branch '$shared_branch' to remote.");
   }
-  info("Done pushing changes to remote shared branch '$shared_branch'") unless $options->{'no-push'};
 
   # if merge not required, no need to go further
   if ($options->{'no-merge'}) {
