@@ -625,7 +625,7 @@ sub _default_groups {
     },
     tools => {
       desc => 'Libraries required to run Ensembl tools such as the VEP',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-tools/],
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-tools ensembl-io/],
     },
     production => {
       desc => 'Libraries required to run Ensembl production',
