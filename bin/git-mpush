@@ -347,15 +347,16 @@ sub switch_branch {
 sub merge_branch {
   my ($branch) = @_;
 
-  my $current_branch  = current_branch();
-  my ($merge_base)    = cmd("git merge-base $current_branch $branch");
-  chomp $merge_base;
+  my $current_branch = current_branch();
 
-  if (cmd_ok("git format-patch $merge_base..$branch --stdout | git apply --check -")) {
-    info("Merging $branch to $current_branch");
-    return no_ff_merge($branch, "Merging $branch to $current_branch");
+  info("Merging $branch to $current_branch");
+  if (!no_ff_merge($branch, "Merging $branch to $current_branch")) {
+    info("Action failed, cleaning up");
+    cmd("git merge --abort");
+    return 0;
   }
-  return 0;
+
+  return 1;
 }
 
 sub random_str {
