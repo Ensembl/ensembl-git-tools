@@ -242,34 +242,53 @@ sub run {
   }
 
   # Now merge the new branch into both master and the release branch
-  my $failed_push = {};
+  my $failed      = {};
+  my $merge_fail  = [];
   for ($master_branch, $release_branch) {
-    switch_branch($_);
 
-    # do the non ff merge
-    info("Merging fixes from '$shared_branch' to '$_'");
-    if (!no_ff_merge($shared_branch, "Merging $shared_branch to $_")) {
-      error("Failed to merge branch '$shared_branch' to '$_'.");
+    # switch to the branch to merge shared branch to it
+    if (!switch_branch($_, 1)) {
+      $failed->{$_} = "Could not switch to branch '$_'";
+      next;
+    }
+
+    # do the non ff merge if possible
+    if (!merge_branch($shared_branch)) {
+      $failed->{$_} = "Could not merge shared branch '$shared_branch' to '$_'";
+      push @$merge_fail, $_;
+      next;
     }
 
     # push the branch
-    $failed_push->{$_} = 1 unless push_branch($remote, $_, $options->{'no-push'});
+    if (!push_branch($remote, $_, $options->{'no-push'})) {
+      $failed->{$_} = "Could not push branch '$_' to '$remote'";
+      next;
+    }
   }
 
   # back to the original branch
   switch_branch($current_branch, 1);
 
-  # Throw error if push failed
-  if (keys %$failed_push) {
-    error(join "\n", 'Following branch(es) could not be push to remote:', keys %$failed_push);
-  } else {
-    if (@{$updated_commits}) {
-      info(join "\n", 'DONE: Successfully updated both branches with following commits:', @{$updated_commits});
-    } else {
-      info("DONE: Nothing to push");
+  # If it failed at some point, tell the use what happenned and what should be done
+  if (keys %$failed) {
+    my @error = (sprintf('Failed to mpush branch%s %s:', keys %$failed > 1 ? 'es' : '', join(' and ', map "'$_'", sort keys %$failed)), map $failed->{$_}, sort keys %$failed);
+    if (@$merge_fail) {
+      push @error, (
+        sprintf('There are some conflicts when merging %s into %s.', $shared_branch, join ' and ', map "'$_'", @$merge_fail),
+        sprintf('Please merge branch%s manually into %s, fix any conflicts and run `git mpush` again.', @$merge_fail > 1 ? 'es' : '', $shared_branch),
+        'Following commands can be useful:',
+        map { sprintf q(For branch %s: git checkout %1$s; git merge --no-ff --log -m 'Merging %s to %1$s' %2$s;), $_, $shared_branch } @$merge_fail
+      );
     }
-    exit 0;
+    error(join "\n", @error);
   }
+
+  if (@{$updated_commits}) {
+    info(join "\n", 'DONE: Successfully updated both branches with following commits:', @{$updated_commits});
+  } else {
+    info("DONE: No local commits to push");
+  }
+  exit 0;
 }
 
 sub update_branch {
@@ -319,8 +338,24 @@ sub switch_branch {
     info("Switching to branch '$branch'");
     if (!checkout($branch)) {
       $warning_only ? info("WARNING: Could not switch to branch '$branch'.") : error("Could not switch to branch '$branch'.");
+      return 0;
     }
   }
+  return 1;
+}
+
+sub merge_branch {
+  my ($branch) = @_;
+
+  my $current_branch  = current_branch();
+  my ($merge_base)    = cmd("git merge-base $current_branch $branch");
+  chomp $merge_base;
+
+  if (cmd_ok("git format-patch $merge_base..$branch --stdout | git apply --check -")) {
+    info("Merging $branch to $current_branch");
+    return no_ff_merge($branch, "Merging $branch to $current_branch");
+  }
+  return 0;
 }
 
 sub random_str {
