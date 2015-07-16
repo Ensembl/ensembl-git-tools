@@ -55,8 +55,8 @@ sub public_repositories {
 # loop through each pages
 # and return the complete json object back.
 sub paginated_rest_request {
-  my ($method, $url, $oauth_token) = @_;  
-  my ($json, $headers) = rest_request($method, $url, $oauth_token);
+  my ($method, $url, $oauth_token, $content) = @_;  
+  my ($json, $headers) = rest_request($method, $url, $oauth_token, $content);
   my ($json_page, $headers_page);
   if ($headers->{link}){
     my @links = split(/,/, $headers->{link});
