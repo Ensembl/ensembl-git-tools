@@ -269,15 +269,17 @@ sub run {
   # back to the original branch
   switch_branch($current_branch, 1);
 
+  info('-' x 10);
+
   # If it failed at some point, tell the use what happenned and what should be done
   if (keys %$failed) {
     my @error = (sprintf('Failed to mpush branch%s %s:', keys %$failed > 1 ? 'es' : '', join(' and ', map "'$_'", sort keys %$failed)), map $failed->{$_}, sort keys %$failed);
     if (@$merge_fail) {
       push @error, (
         sprintf('There are some conflicts when merging %s into %s.', $shared_branch, join ' and ', map "'$_'", @$merge_fail),
-        sprintf('Please merge branch%s manually into %s, fix any conflicts and run `git mpush` again.', @$merge_fail > 1 ? 'es' : '', $shared_branch),
+        sprintf('Please merge branch%s manually into %s, fix any conflicts and run `git push` after that (DO NOT RUN `git mpush`).', @$merge_fail > 1 ? 'es' : '', $shared_branch),
         'Following commands can be useful:',
-        map { sprintf q(For branch %s: git checkout %1$s; git merge --no-ff --log -m 'Merging %s to %1$s' %2$s;), $_, $shared_branch } @$merge_fail
+        map { sprintf qq(For branch %s:\n\tgit checkout %1\$s;\n\tgit merge --no-ff --log -m 'Merging %s to %1\$s' %2\$s;\n\t# fix conflicts\n\tgit add <file>;\n\tgit commit;\n\tgit push;), $_, $shared_branch } @$merge_fail
       );
     }
     error(join "\n", @error);
