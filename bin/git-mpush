@@ -58,7 +58,7 @@ sub run {
   }
 
   # deteched head?
-  if (!$current_branch) {
+  if (!$current_branch || $current_branch eq 'HEAD') {
     error("HEAD is currently not on any branch. If you are in middle of a rebase or merge, please fix or abort it before continuing.");
   }
 
