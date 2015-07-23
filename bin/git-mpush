@@ -144,7 +144,7 @@ sub run {
     if (keys %$failed_push) {
       error(join "\n", 'Following branch(es) could not be push to remote:', keys %$failed_push);
     } else {
-      if (@{$branch_with_commits->{$faster_branch}}) {
+      if (@{$branch_with_commits->{$faster_branch} || []}) {
         info(join "\n", 'DONE: Successfully updated both branches with following commits:', @{$branch_with_commits->{$faster_branch}});
       } else {
         info("DONE: Nothing to push");
