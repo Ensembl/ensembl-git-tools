@@ -190,6 +190,7 @@ sub run {
   info("Grafting new commits to branch '$temp_branch'.");
   if (!cmd_ok("git rebase --onto $shared_branch $remote/$faster_branch $temp_branch")) {
     info("Action failed, cleaning up");
+    cmd("git rebase --abort");
     switch_branch($current_branch, 1);
     cmd("git branch -D $temp_branch");
     error("Could not graft local commits from branch '$faster_branch' to the temporary branch '$temp_branch'.");
