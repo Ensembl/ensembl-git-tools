@@ -1,6 +1,7 @@
 requires 'HTTP::Tiny';
 requires 'JSON';
-requires 'JSON::XS';
+
+recommends 'JSON::XS';
 
 on 'build' => sub {
     requires 'Module::Build::Pluggable';
