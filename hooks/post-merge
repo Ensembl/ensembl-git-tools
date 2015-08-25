@@ -1,0 +1,24 @@
+#!/bin/bash
+# Copyright [1999-2014] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#      http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This script is called by 'git commit' just after doing the actual commit
+# If the user has a config 'user.shared' as true, this script rewrites the
+# just made commit to modify the committer and author as required
+
+bad_commit=$(git log -n1 --format="%s" | grep -E "Merge branch '.+' of .+github\.com.+" | wc -l | grep -v 0)
+if [ -n "$bad_commit" ] ; then
+  printf "\033[0;31mWARNING: Possible bad commit:\033[0m\n"
+  git log -n1 --format="%C(yellow)%h%C(reset) %s"
+fi
