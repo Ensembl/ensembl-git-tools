@@ -374,30 +374,25 @@ sub run_hooks {
 }
 
 sub _enable_hooks {
-    my ($module, $flag) = @_;
-    print STDERR "args to enable_hooks: @_\n";
-    if ($flag) { #enable
-	safe_cwd($module,
-		 sub {
-		     print STDERR "Opening $CENTRAL_HOOKS_DIR\n";
-		     opendir(my $hooks_dir, $CENTRAL_HOOKS_DIR) || die "Can't open hooks dir $CENTRAL_HOOKS_DIR: $!";
-		     
-		     while(my $filen = readdir $hooks_dir) {	  
-			 symlink "$CENTRAL_HOOKS_DIR/$filen", "$LOCAL_HOOKS_DIR/$filen";
-		     }
-		     closedir $hooks_dir;
-		 });
-    }
-    else { #disable
-	safe_cwd($module, 
-		 sub {
-		     opendir(my $hooks_dir, $LOCAL_HOOKS_DIR) || die "Can't open hooks dir $CENTRAL_HOOKS_DIR: $!";
-		     while(my $filen = readdir $hooks_dir) {
-			 unlink "$LOCAL_HOOKS_DIR/$filen" if -l "$LOCAL_HOOKS_DIR/$filen";
-		     }
-		     closedir $hooks_dir;
-		 });
-    }
+  my ($module, $flag) = @_;
+  if ($flag) { #enable
+    safe_cwd($module, sub {
+      opendir(my $hooks_dir, $CENTRAL_HOOKS_DIR);
+      while(my $filen = readdir $hooks_dir) {
+        symlink "$CENTRAL_HOOKS_DIR/$filen", "$LOCAL_HOOKS_DIR/$filen";
+      }
+      closedir $hooks_dir;
+    });
+  }
+  else { #disable
+    safe_cwd($module, sub {
+      opendir(my $hooks_dir, $LOCAL_HOOKS_DIR);
+      while(my $filen = readdir $hooks_dir) {
+        unlink "$LOCAL_HOOKS_DIR/$filen" if -l "$LOCAL_HOOKS_DIR/$filen";
+      }
+      closedir $hooks_dir;
+    });
+  }
 }
 
 sub _loop_modules_and_chdir {
