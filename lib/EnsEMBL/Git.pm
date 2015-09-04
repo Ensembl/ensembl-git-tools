@@ -26,6 +26,8 @@ use Carp;
 use Cwd;
 use File::Spec;
 
+our $VERSION = '1.0.0';
+
 our $DEBUG = 0;
 $DEBUG = $ENV{ENS_GIT_DEBUG} if $ENV{ENS_GIT_DEBUG};
 
