@@ -378,8 +378,8 @@ sub _enable_hooks {
   if ($flag) { #enable
     safe_cwd($module, sub {
       opendir(my $hooks_dir, $CENTRAL_HOOKS_DIR);
-      while(readdir $hooks_dir) {
-        symlink "$CENTRAL_HOOKS_DIR/$_", "$LOCAL_HOOKS_DIR/$_";
+      while(my $filen = readdir $hooks_dir) {
+        symlink "$CENTRAL_HOOKS_DIR/$filen", "$LOCAL_HOOKS_DIR/$filen";
       }
       closedir $hooks_dir;
     });
@@ -387,8 +387,8 @@ sub _enable_hooks {
   else { #disable
     safe_cwd($module, sub {
       opendir(my $hooks_dir, $LOCAL_HOOKS_DIR);
-      while(readdir $hooks_dir) {
-        unlink "$LOCAL_HOOKS_DIR/$_" if -l "$LOCAL_HOOKS_DIR/$_";
+      while(my $filen = readdir $hooks_dir) {
+        unlink "$LOCAL_HOOKS_DIR/$filen" if -l "$LOCAL_HOOKS_DIR/$filen";
       }
       closedir $hooks_dir;
     });
