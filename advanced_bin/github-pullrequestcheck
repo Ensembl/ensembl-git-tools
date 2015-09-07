@@ -29,6 +29,8 @@ use DateTime;
 use DateTime::Format::ISO8601;
 use DateTime::Duration;
 use DateTime::Format::Duration;
+use Text::Unidecode;
+use utf8;
 
 run();
 
@@ -77,6 +79,8 @@ sub run {
   }
   
   if($msg) {
+    #Convert wide characters to ascii
+    $msg =~ s/([^[:ascii:]]+)/unidecode($1)/ge;
     my $email = $opts->{email};
     if($email) {
       open my $sendmail, '|sendmail -t' or die "Cannot open sendmaill: $!";
