@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script is called by 'git commit' just after doing the actual commit
-# If the user has a config 'user.shared' as true, this script rewrites the
-# just made commit to modify the committer and author as required
+# This script is called when git is done merging the commits from remote to the local repository just after 'git pull'
+# If the user had some local commits which have caused the merge to create a new unwanted merge-commit, this script warns the user about that.
 
 bad_commit=$(git log -n1 --format="%s" | grep -E "Merge branch '.+' of .*github\.com.+" | wc -l | grep -v 0)
 if [ -n "$bad_commit" ] ; then
