@@ -17,7 +17,7 @@
 # If the user has a config 'user.shared' as true, this script rewrites the
 # just made commit to modify the committer and author as required
 
-bad_commit=$(git log -n1 --format="%s" | grep -E "Merge branch '.+' of .+github\.com.+" | wc -l | grep -v 0)
+bad_commit=$(git log -n1 --format="%s" | grep -E "Merge branch '.+' of .*github\.com.+" | wc -l | grep -v 0)
 if [ -n "$bad_commit" ] ; then
   printf "\033[0;31mWARNING: Possible bad commit:\033[0m\n"
   git log -n1 --format="%C(yellow)%h%C(reset) %s"
