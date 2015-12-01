@@ -643,7 +643,7 @@ sub _default_groups {
     },
     web => {
       desc => 'Libraries required to run the Ensembl website',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode public-plugins ensembl-orm ensembl-tools ensembl-io/],
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode public-plugins sanger-plugins ensembl-orm ensembl-tools ensembl-io/],
     },
     genebuild => {
       desc => 'Libraries required to run the Ensembl Gene Annotation process',
