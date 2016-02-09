@@ -606,6 +606,7 @@ sub _default_modules {
     'ensembl-internal-variation'   => $root.'ensembl-internal-variation.git',
     'ensembl-test'        => $root.'ensembl-test.git',
     'ensembl-git-tools'   => $root.'ensembl-git-tools.git',
+    'VEP_plugins'         => $root.'VEP_plugins.git',
     'eg-web-common'       => $eg_root.'eg-web-common.git',
     'eg-web-search'       => $eg_root.'eg-web-search.git',
     'eg-web-bacteria'     => $eg_root.'eg-web-bacteria.git',
@@ -617,7 +618,7 @@ sub _default_modules {
     'eg-web-parasite'     => $eg_root.'eg-web-parasite.git',
     'eg-web-testsuite'    => $eg_root.'eg-web-testsuite.git',
     'eg-rest'             => $eg_root.'eg-rest.git',
-    'ensemblgenomes-api'  => $eg_root.'ensemblgenomes-api.git',
+    'ensemblgenomes-api'  => $eg_root.'ensemblgenomes-api.git'
   }
 }
 
@@ -635,11 +636,15 @@ sub _default_groups {
     },
     production => {
       desc => 'Libraries required to run Ensembl production',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-production ensembl-orm/],
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-production ensembl-orm  ensembl-tools ensembl-io ensembl-hive/],
     },
     rest => {
       desc => 'Libraries required to run the Ensembl REST API',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-rest ensembl-io/],
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-rest ensembl-io VEP_plugins/],
+    },
+    'public-web' => {
+      desc => 'Libraries required to run an external mirror of the Ensembl website',
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode public-plugins ensembl-orm ensembl-tools ensembl-io/],
     },
     web => {
       desc => 'Libraries required to run the Ensembl website',
