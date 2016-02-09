@@ -122,6 +122,7 @@ sub parse_command_line {
     email=s
     force_group
     force_module
+    ignore_module=s@
     config|cfg=s
     hooks=s
     verbose
@@ -430,6 +431,10 @@ sub _loop_modules {
   foreach my $module (sort @{$modules}) {
     if($opts->{seen_modules}->{$module}) {
       printf "* Skipping '%s' as we have already processed it\n", $module;
+      next;
+    }
+    if($opts->{ignore_module} && grep( /^$module$/, @{$opts->{ignore_module}})) {
+      printf "* Skipping '%s' requested to ignore it on command line\n", $module;
       next;
     }
     printf "* Working with module '%s'\n", $module;
@@ -904,6 +909,10 @@ Force the interpritation of all additional arguments as groups not as modules
 =item B<--force_module>
 
 Force the interpritation of all additional arguments as modules not as groups
+
+=item B<--ignore_module>
+
+Ignores a given module when processing an action on a group, may be added multiple times to ignore multiple modules
 
 =item B<--list>
 
