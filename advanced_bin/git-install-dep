@@ -1,0 +1,90 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+BEGIN {
+  use File::Basename;
+  use File::Spec;
+  use Cwd;
+  my $dirname = dirname(Cwd::realpath(__FILE__));
+  my $lib = File::Spec->catdir($dirname, File::Spec->updir(), 'lib');
+  if(-d $lib) {
+    unshift(@INC, $lib);
+  }
+  else {
+    die "Cannot find the lib directory in the expected location $lib";
+  }
+};
+
+use Pod::Usage;
+use Getopt::Long;
+use EnsEMBL::Git;
+
+run();
+
+sub run {
+  my $opts = parse_command_line();
+
+  # Do we have an install-deps script in this repository?
+  if(-f 'install-dep') {
+      print "* Installing dependencies for module\n";
+
+      # If so, try to install the dependencies
+      system_ok('./install-dep');
+  }
+
+  exit 0;
+}
+
+sub parse_command_line {
+  my $opts = {
+    help => 0,
+    man => 0
+  };
+
+  GetOptions($opts, qw/
+    help|?
+    man
+  /) or pod2usage(2);
+
+  pod2usage(1) if $opts->{help};
+  pod2usage(-exitval => 0, -verbose => 2) if $opts->{man};
+
+  return $opts;
+}
+
+__END__
+=pod
+
+=head1 NAME
+
+git-install-dep - Install a repository's dependencies using a install-dep script
+
+=head1 SYNOPSIS
+
+  git rewrite-authors [-h] [-m]
+
+  # Install the dependencies for a repository via a install-dep script
+  git install-dep
+
+=head1 DESCRIPTION
+
+If a repository has an install-dep script, execute that script to attempt to
+install the repository dependencies.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--help>
+
+Print the help information
+
+=item B<--man>
+
+Print a man page
+
+=back
+
+=cut
