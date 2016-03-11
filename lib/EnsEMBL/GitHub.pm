@@ -92,7 +92,7 @@ sub rest_request {
   }
   my $response = $http->request($method, $base_url.$url, $options);
   if(! $response->{success}) {
-    use Data::Dumper; warn Dumper $response->{headers}; warn Dumper $response->{content};
+    use Data::Dumper; warn Dumper $response->{headers};
     die "Failed to process $method (${url})! STATUS: $response->{status} REASON: $response->{reason} CONTENT: $response->{content}\n";
   }
   my $decoded_json = JSON::decode_json($response->{content});
