@@ -605,6 +605,7 @@ sub _default_modules {
     'ensembl-xs'          => $root.'ensembl-xs.git',
     'ensembl-internal-variation'   => $root.'ensembl-internal-variation.git',
     'ensembl-test'        => $root.'ensembl-test.git',
+    'ensembl-taxonomy'    => $root.'ensembl-taxonomy.git',
     'ensembl-git-tools'   => $root.'ensembl-git-tools.git',
     'VEP_plugins'         => $root.'VEP_plugins.git',
     'eg-web-common'       => $eg_root.'eg-web-common.git',
@@ -636,7 +637,7 @@ sub _default_groups {
     },
     production => {
       desc => 'Libraries required to run Ensembl production',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-production ensembl-orm  ensembl-tools ensembl-io ensembl-hive/],
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-production ensembl-orm ensembl-tools ensembl-io ensembl-hive ensembl-taxonomy/],
     },
     rest => {
       desc => 'Libraries required to run the Ensembl REST API',
