@@ -279,7 +279,7 @@ sub run {
     if (@$merge_fail) {
       push @error, (
         sprintf('There are some conflicts when merging %s into %s.', $shared_branch, join ' and ', map "'$_'", @$merge_fail),
-        sprintf('Please merge branch %s manually into %s, fix any conflicts and run `git push` after that (DO NOT RUN `git mpush`).', $shared_branch, @$merge_fail > 1 ? 'both branches' : $_),
+        sprintf('Please merge branch %s manually into %s, fix any conflicts and run `git push` after that (DO NOT RUN `git mpush`).', $shared_branch, @$merge_fail > 1 ? 'both branches' : $merge_fail->[0]),
         'Following commands can be useful:',
         map { sprintf qq(For branch %s:\n\tgit checkout %1\$s;\n\tgit merge --no-ff --log -m 'Merging %s to %1\$s' %2\$s;\n\t# fix conflicts\n\tgit add <file>;\n\tgit commit;\n\tgit push;), $_, $shared_branch } @$merge_fail
       );
