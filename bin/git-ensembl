@@ -586,6 +586,7 @@ sub _default_modules {
     'ensembl-variation'   => $root.'ensembl-variation.git',
     'ensembl-funcgen'     => $root.'ensembl-funcgen.git',
     'ensembl-tools'       => $root.'ensembl-tools.git',
+    'ensembl-vep'         => $root.'ensembl-vep.git',
     'ensembl-io'          => $root.'ensembl-io.git',
     'ensembl-production'  => $root.'ensembl-production.git',
     'ensembl-rest'        => $root.'ensembl-rest.git',
