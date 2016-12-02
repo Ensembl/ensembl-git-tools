@@ -609,6 +609,7 @@ sub _default_modules {
     'ensembl-test'        => $root.'ensembl-test.git',
     'ensembl-taxonomy'    => $root.'ensembl-taxonomy.git',
     'ensembl-git-tools'   => $root.'ensembl-git-tools.git',
+    'ensembl-metadata'    => $root.'ensembl-metadata.git',
     'VEP_plugins'         => $root.'VEP_plugins.git',
     'eg-web-common'       => $eg_root.'eg-web-common.git',
     'eg-web-search'       => $eg_root.'eg-web-search.git',
@@ -620,6 +621,7 @@ sub _default_modules {
     'eg-web-g1k'          => $eg_root.'eg-web-g1k.git',
     'eg-web-parasite'     => $eg_root.'eg-web-parasite.git',
     'eg-web-testsuite'    => $eg_root.'eg-web-testsuite.git',
+    'eg-web-vectorbase'   => $eg_root.'eg-web-vectorbase.git',
     'eg-rest'             => $eg_root.'eg-rest.git',
     'ensemblgenomes-api'  => $eg_root.'ensemblgenomes-api.git'
   }
