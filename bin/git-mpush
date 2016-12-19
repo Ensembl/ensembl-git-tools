@@ -146,7 +146,7 @@ sub run {
       error(join "\n", 'Following branch(es) could not be push to remote:', keys %$failed_push);
     } else {
       if (@{$branch_with_commits->{$faster_branch} || []}) {
-        info(join "\n", 'DONE: Successfully updated both branches with following commits:', @{$branch_with_commits->{$faster_branch}});
+        info(join "\n", 'DONE: Successfully updated both branches with following commit(s):', @{$branch_with_commits->{$faster_branch}});
       } else {
         info("DONE: Nothing to push");
       }
@@ -288,7 +288,7 @@ sub run {
   }
 
   if (@{$updated_commits}) {
-    info(join "\n", 'DONE: Successfully updated both branches with following commits:', @{$updated_commits});
+    info(join "\n", 'DONE: Successfully updated both branches with following commit(s):', @{$updated_commits});
   } else {
     info("DONE: No local commits to push");
   }
