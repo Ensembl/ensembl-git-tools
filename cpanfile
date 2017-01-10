@@ -1,6 +1,6 @@
 requires 'HTTP::Tiny';
 requires 'JSON';
-requires 'DateTime::Format::ISO8601';
+requires 'DateTime::Format';
 
 recommends 'JSON::XS';
 
