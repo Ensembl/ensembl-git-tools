@@ -592,6 +592,7 @@ sub _default_modules {
     'ensembl-rest'        => $root.'ensembl-rest.git',
     'ensembl-webcode'     => $root.'ensembl-webcode.git',
     'ensembl-orm'         => $root.'ensembl-orm.git',
+    'ensembl-hdf5'        => $root.'ensembl-hdf5.git',
     'public-plugins'      => $root.'public-plugins.git',
     'sanger-plugins'      => $root.'sanger-plugins.git',
     'biomart-perl'        => $root.'biomart-perl.git',
@@ -646,7 +647,7 @@ sub _default_groups {
     },
     rest => {
       desc => 'Libraries required to run the Ensembl REST API',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-rest ensembl-io VEP_plugins/],
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-rest ensembl-io VEP_plugins ensembl-vep ensembl-hdf5/],
     },
     'public-web' => {
       desc => 'Libraries required to run an external mirror of the Ensembl website',
