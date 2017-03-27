@@ -594,7 +594,7 @@ sub _default_modules {
     'ensembl-orm'         => $root.'ensembl-orm.git',
     'ensembl-hdf5'        => $root.'ensembl-hdf5.git',
     'public-plugins'      => $root.'public-plugins.git',
-    'sanger-plugins'      => $root.'sanger-plugins.git',
+    'ebi-plugins'         => $root.'ebi-plugins.git',
     'biomart-perl'        => $root.'biomart-perl.git',
     'web-utils'           => $root.'web-utils.git',
     'ensembl-hive'        => $root.'ensembl-hive.git',
@@ -655,7 +655,7 @@ sub _default_groups {
     },
     web => {
       desc => 'Libraries required to run the Ensembl website',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode public-plugins sanger-plugins ensembl-orm ensembl-tools ensembl-io/],
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode public-plugins ebi-plugins ensembl-orm ensembl-tools ensembl-io/],
     },
     genebuild => {
       desc => 'Libraries required to run the Ensembl Gene Annotation process',
