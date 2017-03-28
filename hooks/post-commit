@@ -36,7 +36,7 @@ if [ -n "$identity" ] ; then
     fi
     export GIT_COMMITTER_EMAIL=\"$email\"
     export GIT_COMMITTER_NAME=\"$name\"
-  " --  --max-count=1 HEAD > /dev/null
+  " --  HEAD^..HEAD > /dev/null
 
   if [ "$stash" == "1" ] ; then
     git stash pop > /dev/null
