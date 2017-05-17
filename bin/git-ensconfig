@@ -53,7 +53,7 @@ if (( $# >= 1 )) ; then
     ;;
     "--get" )
       if [ "$#" == 1 ] ; then
-        grep "$shell_id" "$config_file" | sed "s/^$shell_id //"
+        grep "^$shell_id " "$config_file" | sed "s/^$shell_id //"
         exit 0
       fi
     ;;
