@@ -23,7 +23,7 @@
 # user.email config
 
 # if user is not shared, enforce setting user.name and user.email
-if [ "$(git config --global user.shared)" != 'true' ] ; then
+if [ "$(git config user.shared)" != 'true' ] ; then
 
   # get configured name and email
   default_name=$(git config --get user.name)
