@@ -19,7 +19,7 @@
 # just made commit to modify the committer and author as required
 
 # if not a shared user
-[ "$(git config --global user.shared)" != 'true' ] && exit 0
+[ "$(git config user.shared)" != 'true' ] && exit 0
 
 # get the saved identity
 identity=$(git ensconfig --get)
