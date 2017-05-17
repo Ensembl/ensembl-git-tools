@@ -32,10 +32,10 @@ if [ "$(git config user.shared)" != 'true' ] ; then
   # Ask the user the fix this first
   if [ -z "$default_name" ] || [ -z "$default_email" ] ; then
     echo "Your name and email address have not been configured. Please configure them with the following command before continuing:
-    git config --global user.name \"Your Name\"
-    git config --global user.email you@example.com"
+    git config [--global] user.name \"Your Name\"
+    git config [--global] user.email you@example.com"
     echo "If the user account is shared among multiple users, please add a configuration with the following command:
-    git config --global user.shared true"
+    git config [--global] user.shared true"
     exit 1
   fi
   exit 0
