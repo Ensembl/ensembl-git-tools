@@ -625,7 +625,8 @@ sub _default_modules {
     'eg-web-testsuite'    => $eg_root.'eg-web-testsuite.git',
     'eg-web-vectorbase'   => $eg_root.'eg-web-vectorbase.git',
     'eg-rest'             => $eg_root.'eg-rest.git',
-    'ensemblgenomes-api'  => $eg_root.'ensemblgenomes-api.git'
+    'ensemblgenomes-api'  => $eg_root.'ensemblgenomes-api.git',
+    'eg-web-ensembl-configs'  => $eg_root.'eg-web-ensembl-configs.git' 
   }
 }
 
@@ -687,7 +688,7 @@ sub _default_groups {
     },
     'eg-all' => {
       desc => 'All Ensembl Genomes libraries',
-      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-testsuite eg-web-bacteria eg-web-fungi eg-web-metazoa eg-web-plants eg-web-protists/],
+      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-testsuite eg-web-bacteria eg-web-fungi eg-web-metazoa eg-web-plants eg-web-protists eg-web-ensembl-configs/],
     },
     'eg-parasite' => {
       desc => 'Libraries required for WormBase ParaSite (Ensembl Genomes Project)',
