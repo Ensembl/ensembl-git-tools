@@ -694,6 +694,10 @@ sub _default_groups {
       desc => 'Libraries required for WormBase ParaSite (Ensembl Genomes Project)',
       modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-testsuite eg-web-parasite/],
     },
+    'regulation' => {
+      desc => 'Libraries required for Ensembl Regulation',
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-io ensj-healthcheck ensembl-hive ensembl-production ensembl-rest ensembl-test VEP_plugins ensembl-vep ensembl-hdf5/],
+    },
   };
 }
 
