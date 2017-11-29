@@ -76,12 +76,13 @@ if [ -z "$identity" ] ; then
   # if git rev-list didn't return any user name
   if [ -z "$match_found" ] ; then
     echo "Sorry, there is no history for author with pattern '$shortname'. If you think this is not correct, please contact your paladin."
+    echo "[Note: This might be true if you have never worked in this repository before. Please use 'git ensconfig' to add your details (run the command for details)]"
     exit 1
   fi
 
   # If none of the found users were valid
   if [ -z "$identity" ] ; then
-    echo "Sorry, none of the the found users for pattern '$shortname' could be confirmed. If you think this is not correct, please contact your paladin."
+    echo "Sorry, none of the found users for pattern '$shortname' could be confirmed. If you think this is not correct, please contact your paladin."
     exit 1
   fi
 
