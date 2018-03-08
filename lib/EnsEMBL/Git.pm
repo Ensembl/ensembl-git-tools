@@ -122,13 +122,23 @@ sub clone {
 
 # Perform a clone but do not bring everything down
 sub shallow_clone {
-  my ($remote_url, $verbose, $remote, $depth, $branch) = @_;
+  my ($remote_url, $verbose, $remote, $depth, $branch, $secondary_branch) = @_;
   $depth //= 1;
   $remote //= 'origin';
   my $v = $verbose ? '--verbose' : q{};
   my $b = $branch ? "--branch $branch" : q{};
   my $d = $depth ? "--depth $depth" : q{};
-  return system_ok("git clone -o $remote $v $d $b $remote_url");
+  
+  # try branch
+  my $rv = system_ok("git clone -o $remote $v $d $b $remote_url");
+
+  # if fail, try secondary_branch
+  if (!$rv) {
+    $b = $secondary_branch ? "--branch $secondary_branch" : q{};
+    $rv = system_ok("git clone -o $remote $v $d $b $remote_url");
+  }
+
+  return $rv;
 }
 
 # Perform a clone but do not create a working sandbox (so just the contents of .git)
