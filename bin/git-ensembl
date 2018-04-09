@@ -214,7 +214,7 @@ sub run_shallowclone {
     }
 
     print "* Cloning from remote '${remote_url}'\n";
-    if(! shallow_clone($remote_url, $verbose, $opts->{remote}, $opts->{depth}, $opts->{branch})) {
+    if(! shallow_clone($remote_url, $verbose, $opts->{remote}, $opts->{depth}, $opts->{branch}, $opts->{secondary_branch})) {
       print STDERR "! Failed to clone the module '$module'\n";
       return;
     }
