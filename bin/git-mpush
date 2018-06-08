@@ -229,7 +229,7 @@ sub run {
 
     # set upstream if shared branch is just created now
     if (!$options->{'no-push'} && $shared_branchpoint) {
-      my ($out) = cmd("git branch --set-upstream $shared_branch $remote/$shared_branch");
+      my ($out) = cmd("git branch -u $remote/$shared_branch");
       print $out;
     }
   } else {
