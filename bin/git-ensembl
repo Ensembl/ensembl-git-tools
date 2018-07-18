@@ -644,7 +644,7 @@ sub _default_groups {
     },
     production => {
       desc => 'Libraries required to run Ensembl production',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-production ensembl-orm ensembl-tools ensembl-io ensembl-hive ensembl-taxonomy ensembl-metadata VersioningService ensembl-vep/],
+      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-production ensembl-prodinf-core ensembl-datacheck ensembl-orm ensembl-tools ensembl-io ensembl-hive ensembl-taxonomy ensembl-metadata VersioningService ensembl-vep/],
     },
     rest => {
       desc => 'Libraries required to run the Ensembl REST API',
