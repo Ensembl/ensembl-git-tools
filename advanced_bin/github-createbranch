@@ -54,6 +54,10 @@ sub run {
     }
     print "* Will now create branch $opts->{branch}\n";
     create_branch($opts, $repo);
+    if ($opts->{'protect'}) {
+      print "* Protecting branch $opts->{branch}\n";
+      protect_branch($opts, $repo);
+    }
     print "* Finished with repo ${repo}\n";
   }
   return;
@@ -91,6 +95,26 @@ sub create_branch {
   my $sha = get_ref_from_branch($opts,$repo);
   print "*   Creating branch $branch in $repo\n";
   get_json($opts, 'POST', "/repos/${organisation}/${repo}/git/refs", {ref => $branch, sha => $sha});
+  print "* Done\n";
+  return;
+}
+
+sub protect_branch {
+  my ($opts, $repo) = @_;
+  if($opts->{'dry-run'}) {
+    print "*   Skipping the protection as we are in --dry-run\n";
+    return;
+  }
+  my $organisation = $opts->{organisation};
+  my $json = get_json($opts, 'GET', "/repos/${organisation}/${repo}/teams");
+  my $teams;
+  foreach my $team (@{$json}){
+    push @{$teams}, $team->{name};
+  }
+  my $required_pull_request_reviews = {"dismiss_stale_reviews" => \0,"require_code_owner_reviews" => \0,"required_approving_review_count" => 1};
+  my $branch = $opts->{branch};
+  print "*   Protecting $branch in $repo\n";
+  get_json($opts, 'PUT', "/repos/${organisation}/${repo}/branches/${branch}/protection", {required_status_checks => undef, enforce_admins => \1, required_pull_request_reviews => ${required_pull_request_reviews} ,restrictions => {"users" => [],"teams" => ${teams}}});
   print "* Done\n";
   return;
 }
@@ -133,6 +157,7 @@ sub parse_command_line {
     from_branch=s
     organisation|organization=s
     dry-run
+    protect
     help|?
     man
   /) or pod2usage(2);
@@ -169,11 +194,15 @@ github-createbranch - A tool for creating branches in GitHub
 
 =head1 SYNOPSIS
 
-github-createbranch --oauth OAUTH [--oauth_file FILE] [--organisation ORG] --branch BRANCH --repository REPO --from_branch FROM_BRANCH [] [--dry-run] [-h] [-m]
+github-createbranch --oauth OAUTH [--oauth_file FILE] [--organisation ORG] --branch BRANCH --repository REPO --from_branch FROM_BRANCH [] [--dry-run] [-h] [-m] [--protect]
 
 # Create branch in a single repo
 
 github-createbranch --oauth XXXXXXXXXXXXXXXXXXXXXX --branch release/74 --repository ensembl --from_branch master
+
+# Create branch and protect it in a single repo
+
+github-createbranch --oauth XXXXXXXXXXXXXXXXXXXXXX --branch release/74 --repository ensembl --from_branch master --protect
 
 # Dry run
 github-createbranch --oauth XXXXXXXXXXXXXXXXXXXXXX --branch release/74 --repository ensembl --from_branch master --dry-run
@@ -219,6 +248,10 @@ The name of the branch to create from. E.g create a branch from master.
 =item B<--repository|repo>
 
 The repository to switch. If not specified we use all public repositories
+
+=item B<--protect>
+
+Protect the branch against push, user will have to create a pull request that will need to be reviewed by one of the repo's team member.
 
 =item B<--dry-run>
 
