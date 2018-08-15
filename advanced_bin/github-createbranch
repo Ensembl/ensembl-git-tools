@@ -106,15 +106,10 @@ sub protect_branch {
     return;
   }
   my $organisation = $opts->{organisation};
-  my $json = get_json($opts, 'GET', "/repos/${organisation}/${repo}/teams");
-  my $teams;
-  foreach my $team (@{$json}){
-    push @{$teams}, $team->{name};
-  }
   my $required_pull_request_reviews = {"dismiss_stale_reviews" => \0,"require_code_owner_reviews" => \0,"required_approving_review_count" => 1};
   my $branch = $opts->{branch};
   print "*   Protecting $branch in $repo\n";
-  get_json($opts, 'PUT', "/repos/${organisation}/${repo}/branches/${branch}/protection", {required_status_checks => undef, enforce_admins => \1, required_pull_request_reviews => ${required_pull_request_reviews} ,restrictions => {"users" => [],"teams" => ${teams}}});
+  get_json($opts, 'PUT', "/repos/${organisation}/${repo}/branches/${branch}/protection", {required_status_checks => undef, enforce_admins => \1, required_pull_request_reviews => ${required_pull_request_reviews}, restrictions => undef});
   print "* Done\n";
   return;
 }
