@@ -85,7 +85,7 @@ sub rest_request {
   die 'No method specified' if ! $method;
   die 'No URL specified' if ! $url;
   my $http = HTTP::Tiny->new();
-  my $options = { headers => { Accept => 'application/vnd.github.v3+json' } };
+  my $options = { headers => { Accept => 'application/vnd.github.luke-cage-preview+json' } };
   $options->{headers}->{Authorization} = "token $oauth_token" if $oauth_token;
   if($content) {
     $options->{headers}->{'Content-Type'} = 'application/json';
