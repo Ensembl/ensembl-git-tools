@@ -38,6 +38,7 @@ BEGIN {
 
 use EnsEMBL::Git;
 use Getopt::Long;
+# use List::MoreUtils qw(uniq);
 
 run();
 
@@ -47,6 +48,7 @@ sub run {
   my $current_branch  = current_branch();
   my $master_branch   = 'master';
   my $release_branch;
+  my $post_release_fix_branch;
 
   # Has to be GIT repo
   if (!is_git_repo()) {
@@ -72,7 +74,7 @@ sub run {
   if (!$options->{'release'}) {
     (my $rel = $current_branch) =~ s/^release\///;
 
-    if ($rel =~ /^\d+$/) {
+    if ($rel =~ /^(eg\/)?\d+$/) {
       $options->{'release'} = $rel;
     } else {
       error("No release number provided.\nEither provide a release number, or checkout on the release branch before running this command.");
@@ -81,6 +83,7 @@ sub run {
   }
 
   $release_branch = "release/$options->{'release'}";
+  $post_release_fix_branch = "postreleasefix/$options->{'release'}";
 
   # Update remote
   info('Updating remote...');
@@ -96,10 +99,46 @@ sub run {
     error("Release branch $release_branch is not a tracking branch.");
   }
 
+  # Postreleasefix branch exists?
+  if (!branch_exists($post_release_fix_branch)) {
+    error("Post-release branch $post_release_fix_branch does not exist.");
+  }
+
+  # Postreleasefix branch exists on remote?
+  if (!branch_exists($post_release_fix_branch, $remote)) {
+    error("Post-release branch $post_release_fix_branch is not a tracking branch.");
+  }
+
   # Update both local branches to origin if possible
-  for ($master_branch, $release_branch) {
+  for ($master_branch, $release_branch, $post_release_fix_branch) {
     update_branch($_, $remote);
   }
+
+=head
+  # For Pull Requests (atm it works without this)
+  my $no_merge = 1;
+  my $prf_commits_master = commits_list($master_branch, $post_release_fix_branch, $no_merge);
+  my $prf_commits_release = commits_list($release_branch, $post_release_fix_branch, $no_merge);
+  my @prf_commits = uniq(@$prf_commits_release, @$prf_commits_master);
+  info("Checking $post_release_fix_branch for any commits");
+  if ($#prf_commits >= 0) {
+    info(join "\n", "Found commits in $post_release_fix_branch:", @prf_commits);
+    info("Do you want to merge them to $release_branch? (y/n)");
+    my $user_input = <>;
+    if ($user_input =~/y|yes/i) {
+      switch_branch($release_branch);
+      if (!ff_merge($post_release_fix_branch)) {
+        error("Could not merge branch '$post_release_fix_branch' to '$release_branch'.");
+      }
+      else {
+        info("DONE: Merging '$post_release_fix_branch' to '$release_branch'");
+      }
+    }
+    else {
+      info("OK, not merging.");
+    }
+  }
+=cut
 
   # Find out the branch that contains commits that need to be pushed
   my $branch_with_commits = {};
@@ -229,7 +268,7 @@ sub run {
 
     # set upstream if shared branch is just created now
     if (!$options->{'no-push'} && $shared_branchpoint) {
-      my ($out) = cmd("git branch -u $remote/$shared_branch");
+      my ($out) = cmd("git branch --set-upstream-to=$remote/$shared_branch $shared_branch");
       print $out;
     }
   } else {
@@ -326,8 +365,9 @@ sub push_branch {
 }
 
 sub commits_list {
-  my ($point_old, $point_new) = @_;
-  my ($commits, $error) = cmd("git log $point_old..$point_new --oneline");
+  my ($point_old, $point_new, $no_merge) = @_;
+  $no_merge = $no_merge ? '--no-merges' : '';
+  my ($commits, $error) = cmd("git log $point_old..$point_new --oneline $no_merge");
 
   if ($error) {
     error("Could not get a list of commits to be pushed (failed to run `git log $point_old..$point_new --oneline`)");
@@ -383,7 +423,7 @@ sub parse_command_line {
   };
 
   GetOptions($options, qw(
-    release=i
+    release=s
     sharedbranch=s
     remote=s
     ff-only!
