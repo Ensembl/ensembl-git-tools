@@ -38,7 +38,7 @@ BEGIN {
 
 use EnsEMBL::Git;
 use Getopt::Long;
-# use List::MoreUtils qw(uniq);
+use List::MoreUtils qw(uniq);
 
 run();
 
@@ -114,31 +114,28 @@ sub run {
     update_branch($_, $remote);
   }
 
-=head
-  # For Pull Requests (atm it works without this)
+  # For Pull Requests
   my $no_merge = 1;
+  # get all commits in PRfix that are not in master or release branches
   my $prf_commits_master = commits_list($master_branch, $post_release_fix_branch, $no_merge);
   my $prf_commits_release = commits_list($release_branch, $post_release_fix_branch, $no_merge);
   my @prf_commits = uniq(@$prf_commits_release, @$prf_commits_master);
-  info("Checking $post_release_fix_branch for any commits");
+  info("Checking $post_release_fix_branch for new commits");
   if ($#prf_commits >= 0) {
     info(join "\n", "Found commits in $post_release_fix_branch:", @prf_commits);
-    info("Do you want to merge them to $release_branch? (y/n)");
+    info("Going to merge above commits to $release_branch. Press any key to continue");
     my $user_input = <>;
-    if ($user_input =~/y|yes/i) {
-      switch_branch($release_branch);
-      if (!ff_merge($post_release_fix_branch)) {
-        error("Could not merge branch '$post_release_fix_branch' to '$release_branch'.");
-      }
-      else {
-        info("DONE: Merging '$post_release_fix_branch' to '$release_branch'");
-      }
+    switch_branch($release_branch);
+    if(!merge_branch($post_release_fix_branch)) {
+      error("Could not merge branch '$post_release_fix_branch' to '$release_branch'.");
     }
     else {
-      info("OK, not merging.");
+      info("DONE: Merging '$post_release_fix_branch' to '$release_branch'");
     }
   }
-=cut
+  else {
+    info("No new commits on $post_release_fix_branch");
+  }
 
   # Find out the branch that contains commits that need to be pushed
   my $branch_with_commits = {};
