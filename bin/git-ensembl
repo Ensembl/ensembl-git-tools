@@ -145,8 +145,7 @@ sub parse_command_line {
   if (!$opts->{list} && !@ARGV) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'No groups specified; please specify some');
   }
-  $opts->{groups} = [ map {s/\/$//;
-    lc($_)} @ARGV ];
+  $opts->{groups} = [ map {s/\/$//; lc($_)} @ARGV ];
 
   return $opts;
 }
@@ -584,8 +583,8 @@ sub _default_modules {
   my $eg_root = ($opts->{ssh}) ? $EG_GITHUB_SSH_ROOT : $EG_GITHUB_HTTPS_ROOT;
   my %def_modules;
   my $def_groups = _default_groups($opts);
-  foreach my $outter (keys %{$def_groups}) {
-    foreach my $module (@{$def_groups->{$outter}->{modules}}) {
+  foreach my $group_name (keys %{$def_groups}) {
+    foreach my $module (@{$def_groups->{$group_name}->{modules}}) {
       if ($module =~ m/^(eg-|ensemblgenomes-)/) {
         $def_modules{$module} = $eg_root . $module . '.git';
       } else {
