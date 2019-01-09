@@ -20,11 +20,11 @@ use warnings;
 # This normally lives in ~ensembl/git-ensembl.cfg or ~/git-ensembl.cfg
 my $CFG_FILE = 'git-ensembl.cfg';
 # All default ensembl repos have this public root
-my $GITHUB_HTTPS_ROOT     = 'https://github.com/Ensembl/';
-my $GITHUB_SSH_ROOT       = 'ssh://git@github.com/Ensembl/';
-my $EG_GITHUB_HTTPS_ROOT	= 'https://github.com/EnsemblGenomes/';
-my $EG_GITHUB_SSH_ROOT    = 'ssh://git@github.com/EnsemblGenomes/';
-my $LOCAL_HOOKS_DIR       = '.git/hooks';
+my $GITHUB_HTTPS_ROOT = 'https://github.com/Ensembl/';
+my $GITHUB_SSH_ROOT = 'ssh://git@github.com/Ensembl/';
+my $EG_GITHUB_HTTPS_ROOT = 'https://github.com/EnsemblGenomes/';
+my $EG_GITHUB_SSH_ROOT = 'ssh://git@github.com/EnsemblGenomes/';
+my $LOCAL_HOOKS_DIR = '.git/hooks';
 my $CENTRAL_HOOKS_DIR;
 
 BEGIN {
@@ -34,7 +34,7 @@ BEGIN {
   my $dirname = dirname(Cwd::realpath(__FILE__));
   my $lib = File::Spec->catdir($dirname, File::Spec->updir(), 'lib');
   $CENTRAL_HOOKS_DIR = File::Spec->catdir($dirname, File::Spec->updir(), 'hooks');
-  if(-d $lib) {
+  if (-d $lib) {
     unshift(@INC, $lib);
   }
   else {
@@ -51,7 +51,7 @@ run();
 
 sub run {
   my $opts = parse_command_line();
-  if($opts->{list}) {
+  if ($opts->{list}) {
     run_list($opts);
     exit 0;
   }
@@ -59,33 +59,33 @@ sub run {
   chdir $opts->{dir};
   verify_groups($opts);
   foreach my $grp (@{$opts->{groups}}) {
-    if($opts->{clone}) {
-      if($opts->{depth}) {
+    if ($opts->{clone}) {
+      if ($opts->{depth}) {
         run_shallowclone($opts, $grp);
       }
       else {
         run_clone($opts, $grp);
       }
     }
-    elsif($opts->{checkout}) {
+    elsif ($opts->{checkout}) {
       run_checkout($opts, $grp);
     }
-    elsif($opts->{local_checkout}) {
+    elsif ($opts->{local_checkout}) {
       run_local_checkout($opts, $grp);
     }
-    elsif($opts->{pull}) {
+    elsif ($opts->{pull}) {
       run_pull($opts, $grp);
     }
-    elsif($opts->{fetch}) {
+    elsif ($opts->{fetch}) {
       run_fetch($opts, $grp);
     }
-    elsif($opts->{status}) {
+    elsif ($opts->{status}) {
       run_status($opts, $grp);
     }
-    elsif($opts->{cmd}) {
+    elsif ($opts->{cmd}) {
       run_git_cmd($opts, $grp);
     }
-    elsif($opts->{hooks}) {
+    elsif ($opts->{hooks}) {
       run_hooks($opts, $grp);
     }
   }
@@ -94,58 +94,58 @@ sub run {
 
 sub parse_command_line {
   my $opts = {
-    dir => cwd(),
-    remote => 'origin',
-    verbose => 0,
-    help => 0,
-    man => 0
+      dir     => cwd(),
+      remote  => 'origin',
+      verbose => 0,
+      help    => 0,
+      man     => 0
   };
 
   GetOptions($opts, qw/
-    clone
-    shallow
-    depth=i
-    checkout
-    local_checkout
-    branch=s
-    secondary_branch=s
-    remote=s
-    pull
-    fetch
-    cmd=s
-    status
-    dir=s
-    groups
-    rebase
-    list
-    ssh
-    name=s
-    email=s
-    force_group
-    force_module
-    ignore_module=s@
-    config|cfg=s
-    hooks=s
-    verbose
-    help|?
-    man
+      clone
+      shallow
+      depth=i
+      checkout
+      local_checkout
+      branch=s
+      secondary_branch=s
+      remote=s
+      pull
+      fetch
+      cmd=s
+      status
+      dir=s
+      groups
+      rebase
+      list
+      ssh
+      name=s
+      email=s
+      force_group
+      force_module
+      ignore_module=s@
+      config|cfg=s
+      hooks=s
+      verbose
+      help|?
+      man
   /) or pod2usage(2);
 
   pod2usage(1) if $opts->{help};
   pod2usage(-exitval => 0, -verbose => 2) if $opts->{man};
 
-  if($opts->{checkout} && ! $opts->{branch}) {
+  if ($opts->{checkout} && !$opts->{branch}) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'You must a --branch when using --checkout');
   }
-  if($opts->{local_checkout} && ! $opts->{branch}) {
+  if ($opts->{local_checkout} && !$opts->{branch}) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'You must a --branch when using --local_checkout');
   }
 
   # parsing grabbed the -- args so we're left with just the final groups
-  if(! $opts->{list} && ! @ARGV) {
+  if (!$opts->{list} && !@ARGV) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'No groups specified; please specify some');
   }
-  $opts->{groups} = [map { s/\/$//; lc($_) } @ARGV];
+  $opts->{groups} = [ map {s/\/$//; lc($_)} @ARGV ];
 
   return $opts;
 }
@@ -156,30 +156,30 @@ sub run_clone {
   _loop_modules($opts, $group, sub {
     my ($module, $remote_url) = @_;
 
-    if ( -d $module) {
+    if (-d $module) {
       print STDERR "! Skipping module as there is already a directory called that; try 'git ensembl --pull'\n";
       return;
     }
 
     print "* Cloning from remote '${remote_url}'\n";
-    if(! clone($remote_url, $verbose, $opts->{remote})) {
+    if (!clone($remote_url, $verbose, $opts->{remote})) {
       print STDERR "! Failed to clone the module '$module'\n";
       return;
     }
 
     # Now deal with config variables
-    if($opts->{name} || $opts->{email}) {
+    if ($opts->{name} || $opts->{email}) {
       safe_cwd($module, sub {
         print "* Setting user/email config variables\n";
         add_config('user.name', $opts->{name}) if $opts->{name};
         add_config('user.email', $opts->{email}) if $opts->{email};
       });
     }
-    
+
     # Switch branch if we had that info
     my $branch = $opts->{branch};
     my $secondary_branch = $opts->{secondary_branch};
-    if($branch) {
+    if ($branch) {
       safe_cwd($module, sub {
         #$remote will be origin since it is the only remote we cloned
         my $remote = 'origin';
@@ -208,13 +208,13 @@ sub run_shallowclone {
   _loop_modules($opts, $group, sub {
     my ($module, $remote_url) = @_;
 
-    if ( -d $module) {
+    if (-d $module) {
       print STDERR "! Skipping module as there is already a directory called that; try 'git ensembl --pull'\n";
       return;
     }
 
     print "* Cloning from remote '${remote_url}'\n";
-    if(! shallow_clone($remote_url, $verbose, $opts->{remote}, $opts->{depth}, $opts->{branch}, $opts->{secondary_branch})) {
+    if (!shallow_clone($remote_url, $verbose, $opts->{remote}, $opts->{depth}, $opts->{branch}, $opts->{secondary_branch})) {
       print STDERR "! Failed to clone the module '$module'\n";
       return;
     }
@@ -232,7 +232,7 @@ sub run_checkout {
   _loop_modules_and_chdir($opts, $group, sub {
     print "* Fetching from origin before checking out\n";
     fetch($verbose);
-    if(! _checkout_tracking_branch($branch, $remote, $verbose, $secondary_branch)) {
+    if (!_checkout_tracking_branch($branch, $remote, $verbose, $secondary_branch)) {
       return;
     }
     return;
@@ -249,10 +249,10 @@ sub run_pull {
   my $rebase = $opts->{rebase};
   _loop_modules_and_chdir($opts, $group, sub {
     my ($module) = @_;
-    if($branch) {
+    if ($branch) {
       print "* Switching branches before initating pull from origin\n";
       # If we cannot switch then bail
-      if(! _checkout_tracking_branch($branch, $remote, $verbose, $secondary_branch)) {
+      if (!_checkout_tracking_branch($branch, $remote, $verbose, $secondary_branch)) {
         return;
       }
     }
@@ -274,11 +274,11 @@ sub run_local_checkout {
   my $verbose = $opts->{verbose};
   _loop_modules_and_chdir($opts, $group, sub {
     # warn current_branch;
-    if(current_branch() eq $branch) {
+    if (current_branch() eq $branch) {
       print "* No need to switch. We are already on branch $branch\n";
       return;
     }
-    if(! branch_exists($branch)) {
+    if (!branch_exists($branch)) {
       print "* Branch $branch does not exist; creating a new one\n";
       branch($branch, $verbose);
     }
@@ -293,7 +293,7 @@ sub _checkout_tracking_branch {
   print "* Checking out branch '${branch}'";
   print ". Using '${secondary_branch}' as a backup" if $secondary_branch;
   print "\n";
-  if(! checkout_tracking($branch, $remote, $verbose, $secondary_branch)) {
+  if (!checkout_tracking($branch, $remote, $verbose, $secondary_branch)) {
     printf STDERR "! Cannot switch to ${branch}\n";
     return 0;
   }
@@ -353,13 +353,13 @@ sub run_git_cmd {
 sub run_hooks {
   my ($opts, $group) = @_;
 
-  if($opts->{hooks} !~ /^(en|dis)able$/) {
+  if ($opts->{hooks} !~ /^(en|dis)able$/) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'You must provide a flag (enable or disable) when using --hooks');
   }
 
   my $enable = $opts->{hooks} eq 'enable';
 
-  if ($enable && ! -d $CENTRAL_HOOKS_DIR) {
+  if ($enable && !-d $CENTRAL_HOOKS_DIR) {
     print STDERR "Could not enable git hooks as hooks directory is missing.\n";
     return;
   }
@@ -380,7 +380,7 @@ sub _enable_hooks {
   if ($flag) { #enable
     safe_cwd($module, sub {
       opendir(my $hooks_dir, $CENTRAL_HOOKS_DIR);
-      while(my $filen = readdir $hooks_dir) {
+      while (my $filen = readdir $hooks_dir) {
         symlink "$CENTRAL_HOOKS_DIR/$filen", "$LOCAL_HOOKS_DIR/$filen";
       }
       closedir $hooks_dir;
@@ -389,7 +389,7 @@ sub _enable_hooks {
   else { #disable
     safe_cwd($module, sub {
       opendir(my $hooks_dir, $LOCAL_HOOKS_DIR);
-      while(my $filen = readdir $hooks_dir) {
+      while (my $filen = readdir $hooks_dir) {
         unlink "$LOCAL_HOOKS_DIR/$filen" if -l "$LOCAL_HOOKS_DIR/$filen";
       }
       closedir $hooks_dir;
@@ -401,12 +401,12 @@ sub _loop_modules_and_chdir {
   my ($opts, $group, $callback) = @_;
   _loop_modules($opts, $group, sub {
     my ($module, $remote) = @_;
-    if (! -d $module) {
+    if (!-d $module) {
       print STDERR "! Skipping module as there is no directory called that; try 'git ensembl --clone'\n";
       return;
     }
     chdir($module);
-    if(is_git_repo()) {
+    if (is_git_repo()) {
       $callback->($module, $remote);
     }
     else {
@@ -424,29 +424,30 @@ sub _loop_modules {
   printf "* Processing '%s'\n\n", $group;
   my $modules_lookup = get_modules($opts);
   my $modules = group_to_modules($opts, $group);
-  if(! @{$modules}) {
+  if (!@{$modules}) {
     print "* Cannot find any modules. Check that this group was active using --list\n";
     return;
   }
 
   foreach my $module (sort @{$modules}) {
-    if($opts->{seen_modules}->{$module}) {
+    if ($opts->{seen_modules}->{$module}) {
       printf "* Skipping '%s' as we have already processed it\n", $module;
       next;
     }
-    if($opts->{ignore_module} && grep( /^$module$/, @{$opts->{ignore_module}})) {
+    if ($opts->{ignore_module} && grep ( /^$module$/, @{$opts->{ignore_module}})) {
       printf "* Skipping '%s' requested to ignore it on command line\n", $module;
       next;
     }
     printf "* Working with module '%s'\n", $module;
     my $remote = $modules_lookup->{$module};
-    if(!$remote) {
+    if (!$remote) {
       printf "* Skipping '%s' as we had no remote URL linked to it. Check your config\n", $module;
       next;
     }
     $callback->($module, $remote);
     $opts->{seen_modules}->{$module} = 1;
-  } continue {
+  }
+  continue {
     print "\n";
   }
 
@@ -459,18 +460,18 @@ sub verify_groups {
   my $modules = get_modules($opts);
   my $groups = get_groups($opts);
   foreach my $group (@{$opts->{groups}}) {
-    if($opts->{force_module}) {
-      if(! exists $modules->{$group}) {
+    if ($opts->{force_module}) {
+      if (!exists $modules->{$group}) {
         pod2usage(-exitval => 1, -verbose => 0, -msg => "--force_module is on. We do not understand the module '${group}'. Please use the --list command to see all available groups and modules");
       }
     }
-    elsif($opts->{force_group}) {
-      if(! exists $groups->{$group}) {
+    elsif ($opts->{force_group}) {
+      if (!exists $groups->{$group}) {
         pod2usage(-exitval => 1, -verbose => 0, -msg => "--force_group is on. We do not understand the group '${group}'. Please use the --list command to see all available groups and modules");
       }
     }
     else {
-      if(! exists $groups->{$group} && ! exists $modules->{$group}) {
+      if (!exists $groups->{$group} && !exists $modules->{$group}) {
         pod2usage(-exitval => 1, -verbose => 0, -msg => "We do not understand the group or module '${group}'. Please use the --list command to see all available groups and modules");
       }
     }
@@ -482,19 +483,19 @@ sub group_to_modules {
   my ($opts, $group) = @_;
   my $modules = get_modules($opts);
   my $groups = get_groups($opts);
-  if($opts->{force_group}) {
-    return $groups->{$group}->{modules};  
+  if ($opts->{force_group}) {
+    return $groups->{$group}->{modules};
   }
-  elsif($opts->{force_module}) {
-    return [$group] if exits $modules->{$group};
+  elsif ($opts->{force_module}) {
+    return [ $group ] if exits $modules->{$group};
   }
   else {
-    if(exists $modules->{$group}) {
-      return [$group];
+    if (exists $modules->{$group}) {
+      return [ $group ];
     }
-    elsif(exists $groups->{$group}) {
+    elsif (exists $groups->{$group}) {
       #Otherwise return the group. We know it's OK because of verify_groups()
-      return $groups->{$group}->{modules};  
+      return $groups->{$group}->{modules};
     }
   }
   return {};
@@ -505,28 +506,28 @@ sub get_groups {
   return $opts->{built}->{groups} if exists $opts->{built}->{groups};
   my $default_groups = _default_groups($opts);
   my $central_cfg = _central_cfg($opts);
-  my $user_cfg    = _user_cfg($opts);
-  my $cmd_cfg     = _cmdline_cfg($opts);
-  
+  my $user_cfg = _user_cfg($opts);
+  my $cmd_cfg = _cmdline_cfg($opts);
+
   my $groups = {
-    %{$default_groups},
-    (%{$central_cfg->{groups} || {}}),
-    (%{$user_cfg->{groups} || {}}),
-    (%{$cmd_cfg->{groups} || {}}),
+      %{$default_groups},
+      (%{$central_cfg->{groups} || {}}),
+      (%{$user_cfg->{groups} || {}}),
+      (%{$cmd_cfg->{groups} || {}}),
   };
-  
-  if(! exists $groups->{all} || ! exists $groups->{available}) {
+
+  if (!exists $groups->{all} || !exists $groups->{available}) {
     my $modules = get_modules($opts);
     $groups->{all} ||= {
-      desc => 'An auto-genreated group pointing at all modules known to the script. Use this to apply commands to all repositories',
-      modules => [keys %{$modules}],
+        desc    => 'An auto-generated group pointing at all modules known to the script. Use this to apply commands to all repositories',
+        modules => [ keys %{$modules} ],
     };
     $groups->{available} ||= {
-      desc => 'An auto-genreated group pointing at all modules known to the script, and available in the directory. Use this to apply commands to all available repositories',
-      modules => [grep -d, keys %{$modules}],
+        desc    => 'An auto-generated group pointing at all modules known to the script, and available in the directory. Use this to apply commands to all available repositories',
+        modules => [ grep -d, keys %{$modules} ],
     };
   }
-  
+
   return $opts->{built}->{groups} = $groups;
 }
 
@@ -535,14 +536,14 @@ sub get_modules {
   return $opts->{built}->{modules} if exists $opts->{built}->{modules};
   my $default_modules = _default_modules($opts);
   my $central_cfg = _central_cfg($opts);
-  my $user_cfg    = _user_cfg($opts);
-  my $cmd_cfg     = _cmdline_cfg($opts);
+  my $user_cfg = _user_cfg($opts);
+  my $cmd_cfg = _cmdline_cfg($opts);
   return $opts->{built}->{modules} = {
-    %{$default_modules},
-    (%{$central_cfg->{modules} || {}}),
-    (%{$user_cfg->{modules} || {}}),
-    (%{$cmd_cfg->{modules} || {}}),
-  }; 
+      %{$default_modules},
+      (%{$central_cfg->{modules} || {}}),
+      (%{$user_cfg->{modules} || {}}),
+      (%{$cmd_cfg->{modules} || {}}),
+  };
 }
 
 # Grab the user groups from $HOME/$CFG_FILE
@@ -557,7 +558,7 @@ sub _central_cfg {
   my ($opts) = @_;
   my $ens_home = (getpwnam('ensembl'))[7];
   # If ens_home was undefined then we don't have an ensembl user so skip
-  return {} if ! defined $ens_home;
+  return {} if !defined $ens_home;
   return _json(File::Spec->catfile($ens_home, $CFG_FILE));
 }
 
@@ -570,134 +571,98 @@ sub _cmdline_cfg {
 # Load a JSON file. Also do error checking for file existence
 sub _json {
   my ($file) = @_;
-  return {} if ! $file;
-  return {} if ! -f $file;
+  return {} if !$file;
+  return {} if !-f $file;
   return json($file);
 }
 
 # Provide the default repos
 sub _default_modules {
   my ($opts) = @_;
-  my $root = ($opts->{ssh}) ? $GITHUB_SSH_ROOT : $GITHUB_HTTPS_ROOT;
+  my $ens_root = ($opts->{ssh}) ? $GITHUB_SSH_ROOT : $GITHUB_HTTPS_ROOT;
   my $eg_root = ($opts->{ssh}) ? $EG_GITHUB_SSH_ROOT : $EG_GITHUB_HTTPS_ROOT;
-  return {
-    'ensembl'             => $root.'ensembl.git',
-    'ensembl-compara'     => $root.'ensembl-compara.git',
-    'ensembl-variation'   => $root.'ensembl-variation.git',
-    'ensembl-funcgen'     => $root.'ensembl-funcgen.git',
-    'ensembl-tools'       => $root.'ensembl-tools.git',
-    'ensembl-vep'         => $root.'ensembl-vep.git',
-    'ensembl-io'          => $root.'ensembl-io.git',
-    'ensembl-production'  => $root.'ensembl-production.git',
-    'ensembl-rest'        => $root.'ensembl-rest.git',
-    'ensembl-webcode'     => $root.'ensembl-webcode.git',
-    'ensembl-orm'         => $root.'ensembl-orm.git',
-    'ensembl-hdf5'        => $root.'ensembl-hdf5.git',
-    'public-plugins'      => $root.'public-plugins.git',
-    'ebi-plugins'         => $root.'ebi-plugins.git',
-    'biomart-perl'        => $root.'biomart-perl.git',
-    'web-utils'           => $root.'web-utils.git',
-    'ensembl-hive'        => $root.'ensembl-hive.git',
-    'ensembl-analysis'    => $root.'ensembl-analysis.git',
-    'ensembl-pipeline'    => $root.'ensembl-pipeline.git',
-    'ensembl-killlist'    => $root.'ensembl-killlist.git',
-    'ensembl-test'        => $root.'ensembl-test.git',
-    'ensj-healthcheck'    => $root.'ensj-healthcheck.git',
-    'WiggleTools'         => $root.'WiggleTools.git',
-    'VersioningService'   => $root.'VersioningService.git',
-    'ensembl-doc'         => $root.'ensembl-doc.git',
-    'ensembl-xs'          => $root.'ensembl-xs.git',
-    'ensembl-internal-variation'   => $root.'ensembl-internal-variation.git',
-    'ensembl-test'        => $root.'ensembl-test.git',
-    'ensembl-taxonomy'    => $root.'ensembl-taxonomy.git',
-    'ensembl-git-tools'   => $root.'ensembl-git-tools.git',
-    'ensembl-metadata'    => $root.'ensembl-metadata.git',
-    'VEP_plugins'         => $root.'VEP_plugins.git',
-    'eg-web-common'       => $eg_root.'eg-web-common.git',
-    'eg-web-search'       => $eg_root.'eg-web-search.git',
-    'eg-web-bacteria'     => $eg_root.'eg-web-bacteria.git',
-    'eg-web-fungi'        => $eg_root.'eg-web-fungi.git',
-    'eg-web-metazoa'      => $eg_root.'eg-web-metazoa.git',
-    'eg-web-plants'       => $eg_root.'eg-web-plants.git',
-    'eg-web-protists'     => $eg_root.'eg-web-protists.git',
-    'eg-web-g1k'          => $eg_root.'eg-web-g1k.git',
-    'eg-web-parasite'     => $eg_root.'eg-web-parasite.git',
-    'eg-web-testsuite'    => $eg_root.'eg-web-testsuite.git',
-    'eg-web-vectorbase'   => $eg_root.'eg-web-vectorbase.git',
-    'eg-rest'             => $eg_root.'eg-rest.git',
-    'ensemblgenomes-api'  => $eg_root.'ensemblgenomes-api.git',
-    'eg-web-ensembl-configs'  => $eg_root.'eg-web-ensembl-configs.git' 
+  my %def_modules;
+  my $def_groups = _default_groups($opts);
+  foreach my $group_name (keys %{$def_groups}) {
+    foreach my $module (@{$def_groups->{$group_name}->{modules}}) {
+      if ($module =~ m/^(eg-|ensemblgenomes-)/) {
+        $def_modules{$module} = $eg_root . $module . '.git';
+      } else {
+        $def_modules{$module} = $ens_root . $module . '.git';
+      }
+    }
   }
+  return \%def_modules;
 }
 
 # Provide the default groups
 sub _default_groups {
   my ($opts) = @_;
   return {
-    api => {
-      desc => 'API module set used for querying and processing Ensembl data',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-io/],
-    },
-    tools => {
-      desc => 'Libraries required to run Ensembl tools such as the VEP',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-tools ensembl-io/],
-    },
-    production => {
-      desc => 'Libraries required to run Ensembl production',
-      modules => [qw/ensembl ensembl-biomart ensembl-compara ensembl-database-loader ensembl-datacheck ensembl-funcgen ensembl-hive ensembl-io ensembl-metadata ensembl-orm ensembl-prodinf-core ensembl-prodinf-srv ensembl-production ensembl-taxonomy ensembl-tools ensembl-variation VersioningService ensembl-vep ols-client ols-ensembl-loader/],
-    },
-    rest => {
-      desc => 'Libraries required to run the Ensembl REST API',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-rest ensembl-io VEP_plugins ensembl-vep ensembl-hdf5/],
-    },
-    'public-web' => {
-      desc => 'Libraries required to run an external mirror of the Ensembl website',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode public-plugins ensembl-orm ensembl-tools ensembl-io/],
-    },
-    web => {
-      desc => 'Libraries required to run the Ensembl website',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode public-plugins ebi-plugins ensembl-orm ensembl-tools ensembl-io/],
-    },
-    genebuild => {
-      desc => 'Libraries required to run the Ensembl Gene Annotation process',
-      modules => [qw/ensembl ensembl-analysis ensembl-pipeline ensembl-killlist ensembl-production/],
-    },
-    'eg-bacteria' => {
-      desc => 'Libraries required for Ensembl Genomes Bacteria',
-      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-bacteria/],
-    },
-    'eg-fungi' => {
-      desc => 'Libraries required for Ensembl Genomes Fungi',
-      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-fungi/],
-    },
-    'eg-metazoa' => {
-      desc => 'Libraries required for Ensembl Genomes Metazoa',
-      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-metazoa/],
-    },
-    'eg-plants' => {
-      desc => 'Libraries required for Ensembl Genomes Plants',
-      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-plants/],
-    },
-    'eg-protists' => {
-      desc => 'Libraries required for Ensembl Genomes Protists',
-      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-protists/],
-    },
-    'eg-g1k' => {
-      desc => 'Libraries required for 1000 Genomes',
-      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-g1k/],
-    },
-    'eg-all' => {
-      desc => 'All Ensembl Genomes libraries',
-      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-testsuite eg-web-bacteria eg-web-fungi eg-web-metazoa eg-web-plants eg-web-protists eg-web-ensembl-configs/],
-    },
-    'eg-parasite' => {
-      desc => 'Libraries required for WormBase ParaSite (Ensembl Genomes Project)',
-      modules => [qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-testsuite eg-web-parasite/],
-    },
-    'regulation' => {
-      desc => 'Libraries required for Ensembl Regulation',
-      modules => [qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-io ensj-healthcheck ensembl-hive ensembl-production ensembl-rest ensembl-test VEP_plugins ensembl-vep ensembl-hdf5/],
-    },
+      api           => {
+          desc    => 'API module set used for querying and processing Ensembl data',
+          modules => [ qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-io/ ],
+      },
+      tools         => {
+          desc    => 'Libraries required to run Ensembl tools such as the VEP',
+          modules => [ qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-tools ensembl-io/ ],
+      },
+      production    => {
+          desc    => 'Libraries required to run Ensembl production',
+          modules => [ qw/ensembl ensembl-biomart ensembl-compara ensembl-database-loader ensembl-datacheck ensembl-funcgen ensembl-hive ensembl-io ensembl-metadata ensembl-orm ensembl-prodinf-core ensembl-prodinf-srv ensembl-production ensembl-taxonomy ensembl-tools ensembl-variation VersioningService ensembl-vep ols-client ols-ensembl-loader/ ],
+      },
+      rest          => {
+          desc    => 'Libraries required to run the Ensembl REST API',
+          modules => [ qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-rest ensembl-io VEP_plugins ensembl-vep ensembl-hdf5/ ],
+      },
+      'public-web'  => {
+          desc    => 'Libraries required to run an external mirror of the Ensembl website',
+          modules => [ qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode public-plugins ensembl-orm ensembl-tools ensembl-io/ ],
+      },
+      web           => {
+          desc    => 'Libraries required to run the Ensembl website',
+          modules => [ qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode public-plugins ebi-plugins ensembl-orm ensembl-tools ensembl-io/ ],
+      },
+      genebuild     => {
+          desc    => 'Libraries required to run the Ensembl Gene Annotation process',
+          modules => [ qw/ensembl ensembl-analysis ensembl-pipeline ensembl-killlist ensembl-production/ ],
+      },
+      'eg-bacteria' => {
+          desc    => 'Libraries required for Ensembl Genomes Bacteria',
+          modules => [ qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-bacteria/ ],
+      },
+      'eg-fungi'    => {
+          desc    => 'Libraries required for Ensembl Genomes Fungi',
+          modules => [ qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-fungi/ ],
+      },
+      'eg-metazoa'  => {
+          desc    => 'Libraries required for Ensembl Genomes Metazoa',
+          modules => [ qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-metazoa/ ],
+      },
+      'eg-plants'   => {
+          desc    => 'Libraries required for Ensembl Genomes Plants',
+          modules => [ qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-plants/ ],
+      },
+      'eg-protists' => {
+          desc    => 'Libraries required for Ensembl Genomes Protists',
+          modules => [ qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-protists/ ],
+      },
+      'eg-g1k'      => {
+          desc    => 'Libraries required for 1000 Genomes',
+          modules => [ qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-g1k/ ],
+      },
+      'eg-all'      => {
+          desc    => 'All Ensembl Genomes libraries',
+          modules => [ qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-testsuite eg-web-bacteria eg-web-fungi eg-web-metazoa eg-web-plants eg-web-protists eg-web-ensembl-configs/ ],
+      },
+      'eg-parasite' => {
+          desc    => 'Libraries required for WormBase ParaSite (Ensembl Genomes Project)',
+          modules => [ qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-testsuite eg-web-parasite/ ],
+      },
+      'regulation'  => {
+          desc    => 'Libraries required for Ensembl Regulation',
+          modules => [ qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-io ensj-healthcheck ensembl-hive ensembl-production ensembl-rest ensembl-test VEP_plugins ensembl-vep ensembl-hdf5/ ],
+      },
   };
 }
 
