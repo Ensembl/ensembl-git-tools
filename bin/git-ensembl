@@ -629,23 +629,23 @@ sub _default_groups {
       },
       'eg-bacteria' => {
           desc    => 'Libraries required for Ensembl Genomes Bacteria',
-          modules => [ qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-bacteria/ ],
+          modules => [ qw/eg-web-common eg-web-search eg-web-bacteria ensembl-metadata ensembl-taxonomy/ ],
       },
       'eg-fungi'    => {
           desc    => 'Libraries required for Ensembl Genomes Fungi',
-          modules => [ qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-fungi/ ],
+          modules => [ qw/eg-web-common eg-web-search eg-web-fungi ensembl-metadata ensembl-taxonomy/ ],
       },
       'eg-metazoa'  => {
           desc    => 'Libraries required for Ensembl Genomes Metazoa',
-          modules => [ qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-metazoa/ ],
+          modules => [ qw/eg-web-common eg-web-search eg-web-metazoa ensembl-metadata ensembl-taxonomy/ ],
       },
       'eg-plants'   => {
           desc    => 'Libraries required for Ensembl Genomes Plants',
-          modules => [ qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-plants/ ],
+          modules => [ qw/eg-web-common eg-web-search eg-web-plants ensembl-metadata ensembl-taxonomy/ ],
       },
       'eg-protists' => {
           desc    => 'Libraries required for Ensembl Genomes Protists',
-          modules => [ qw/eg-web-common eg-web-search ensemblgenomes-api eg-web-protists/ ],
+          modules => [ qw/eg-web-common eg-web-search eg-web-protists ensembl-metadata ensembl-taxonomy/ ],
       },
       'eg-g1k'      => {
           desc    => 'Libraries required for 1000 Genomes',
