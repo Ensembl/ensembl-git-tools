@@ -661,7 +661,7 @@ sub _default_groups {
       },
       'regulation'  => {
           desc    => 'Libraries required for Ensembl Regulation',
-          modules => [ qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-io ensj-healthcheck ensembl-hive ensembl-production ensembl-rest ensembl-test VEP_plugins ensembl-vep ensembl-hdf5/ ],
+          modules => [ qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-io ensj-healthcheck ensembl-hive ensembl-production ensembl-rest ensembl-test VEP_plugins ensembl-vep ensembl-hdf5 ensembl-datacheck/ ],
       },
   };
 }
