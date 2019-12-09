@@ -609,7 +609,7 @@ sub _default_groups {
       },
       production    => {
           desc    => 'Libraries required to run Ensembl production',
-          modules => [ qw/ensembl ensembl-biomart ensembl-compara ensembl-database-loader ensembl-datacheck ensembl-funcgen ensembl-hive ensembl-io ensembl-metadata ensembl-orm ensembl-prodinf-core ensembl-prodinf-srv ensembl-production ensembl-taxonomy ensembl-tools ensembl-variation VersioningService ensembl-vep ols-client ols-ensembl-loader/ ],
+          modules => [ qw/ensembl ensembl-biomart ensembl-compara ensembl-database-loader ensembl-datacheck ensembl-funcgen ensembl-hive ensembl-io ensembl-metadata ensembl-ontology-schema ensembl-orm ensembl-prodinf-core ensembl-prodinf-srv ensembl-production ensembl-taxonomy ensembl-tools ensembl-variation VersioningService ensembl-vep ols-client ols-ensembl-loader/ ],
       },
       rest          => {
           desc    => 'Libraries required to run the Ensembl REST API',
