@@ -145,7 +145,7 @@ sub parse_command_line {
   if (!$opts->{list} && !@ARGV) {
     pod2usage(-exitval => 1, -verbose => 1, -msg => 'No groups specified; please specify some');
   }
-  $opts->{groups} = [ map {s/\/$//; lc($_)} @ARGV ];
+  $opts->{groups} = [ map {s/\/$//; $_} @ARGV ];
 
   return $opts;
 }
