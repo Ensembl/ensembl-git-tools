@@ -615,6 +615,10 @@ sub _default_groups {
           desc    => 'Libraries required to run the Ensembl REST API',
           modules => [ qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-rest ensembl-io VEP_plugins ensembl-vep ensembl-hdf5/ ],
       },
+      rapid         => {
+          desc    => 'Libraries required to run Ensembl Rapid Release website',
+          modules => [ qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode public-plugins ebi-plugins ensembl-orm ensembl-tools ensembl-io ensembl-hive ensembl-metadata ensembl-rapid/ ],
+      },
       'public-web'  => {
           desc    => 'Libraries required to run an external mirror of the Ensembl website',
           modules => [ qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-webcode public-plugins ensembl-orm ensembl-tools ensembl-io/ ],
