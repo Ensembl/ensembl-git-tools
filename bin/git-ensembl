@@ -601,7 +601,7 @@ sub _default_groups {
   return {
       api           => {
           desc    => 'API module set used for querying and processing Ensembl data',
-          modules => [ qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-io/ ],
+          modules => [ qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-io ensembl-taxonomy ensembl-metadata/ ],
       },
       tools         => {
           desc    => 'Libraries required to run Ensembl tools such as the VEP',
@@ -613,7 +613,7 @@ sub _default_groups {
       },
       rest          => {
           desc    => 'Libraries required to run the Ensembl REST API',
-          modules => [ qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-rest ensembl-io VEP_plugins ensembl-vep ensembl-hdf5/ ],
+          modules => [ qw/ensembl ensembl-compara ensembl-variation ensembl-funcgen ensembl-rest ensembl-io VEP_plugins ensembl-vep ensembl-hdf5 ensembl-taxonomy ensembl-metadata/ ],
       },
       rapid         => {
           desc    => 'Libraries required to run Ensembl Rapid Release website',
