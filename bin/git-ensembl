@@ -629,7 +629,7 @@ sub _default_groups {
       },
       genebuild     => {
           desc    => 'Libraries required to run the Ensembl Gene Annotation process',
-          modules => [ qw/ensembl ensembl-analysis ensembl-pipeline ensembl-killlist ensembl-production/ ],
+          modules => [ qw/ensembl ensembl-analysis ensembl-hive ensembl-killlist ensembl-production ensembl-taxonomy ensembl-metadata ensembl-variation ensembl-compara ensembl-genes ensembl-io/ ],
       },
       'eg-bacteria' => {
           desc    => 'Libraries required for Ensembl Genomes Bacteria',
