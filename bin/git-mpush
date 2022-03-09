@@ -147,14 +147,16 @@ sub run {
 
   # If both branches have unpushed commits, we don't try to be over-intelligent and move commits around - leave that on to the user
   if (keys %$branch_with_commits == 2) {
-    error("Both '$master_branch' and '$release_branch' branches have commits to push. Please move these commits to one branch before you continue.");
+    error("Both '$master_branch' and '$release_branch' branches have commits to push. Please move these commits to release branch before you continue.");
   }
 
   # save pointers to the slower and the faster branch
   my ($slower_branch, $faster_branch) = sort { exists $branch_with_commits->{$a} ? 1 : -1 } $master_branch, $release_branch;
 
+
   # If remote branches are actually at same point (and user doesn't mind fast-forwarding), fast-forward the slower local branch to the other
-  if (!$options->{'no-ff'} && rev_parse("$remote/$release_branch") eq rev_parse("$remote/$master_branch")) {
+  if (!$options->{'no-ff'} && rev_parse("$remote/$release_branch") eq rev_parse("$remote/$post_release_fix_branch")
+      && rev_parse("$remote/$release_branch") eq rev_parse("$remote/$master_branch") ) {
 
     # checkout the slower branch
     switch_branch($slower_branch);
@@ -165,11 +167,20 @@ sub run {
       error("Could not fast-forward branch '$slower_branch' to '$faster_branch'.");
     }
 
-    info("Local branches '$master_branch' and '$release_branch' are at the same point now.");
+    # checkout the postreleasefix branch to do a fast-forward merge so that all 3 branches are up to date with latest commits
+    switch_branch($post_release_fix_branch);
 
-    # Finally push both branches
+    # fast-forward merge the faster branch to the slower one
+    info("Attempting to fast-forward branch '$post_release_fix_branch' to '$faster_branch'");
+    if (!ff_merge($faster_branch)) {
+      error("Could not fast-forward branch '$post_release_fix_branch' to '$faster_branch'.");
+    }
+
+    info("Local branches '$master_branch', '$release_branch' and '$post_release_fix_branch' are at the same point now.");
+
+    # Finally push both
     my $failed_push = {};
-    for ($master_branch, $release_branch) {
+    for ($master_branch, $release_branch, $post_release_fix_branch) {
       if (!push_branch($remote, $_, $options->{'no-push'})) {
         $failed_push->{$_} = 1;
       }
@@ -182,7 +193,7 @@ sub run {
       error(join "\n", 'Following branch(es) could not be push to remote:', keys %$failed_push);
     } else {
       if (@{$branch_with_commits->{$faster_branch} || []}) {
-        info(join "\n", 'DONE: Successfully updated both branches with following commit(s):', @{$branch_with_commits->{$faster_branch}});
+        info(join "\n", 'DONE: Successfully updated 3 branches with following commit(s):', @{$branch_with_commits->{$faster_branch}});
       } else {
         info("DONE: Nothing to push");
       }
@@ -225,6 +236,7 @@ sub run {
 
   # Graft the temp branch on the shared branch
   info("Grafting new commits to branch '$temp_branch'.");
+  info("Command run: git rebase --onto $shared_branch $remote/$faster_branch $temp_branch");
   if (!cmd_ok("git rebase --onto $shared_branch $remote/$faster_branch $temp_branch")) {
     info("Action failed, cleaning up");
     cmd("git rebase --abort");
