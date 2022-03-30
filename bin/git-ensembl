@@ -25,7 +25,6 @@ my $GITHUB_SSH_ROOT = 'ssh://git@github.com/Ensembl/';
 my $EG_GITHUB_HTTPS_ROOT = 'https://github.com/EnsemblGenomes/';
 my $EG_GITHUB_SSH_ROOT = 'ssh://git@github.com/EnsemblGenomes/';
 my $SO_GITHUB_URL = 'https://github.com/The-Sequence-Ontology/';
-my $GIFTS_GITHUB_URL = 'https://github.com/Ensembl/';
 my $LOCAL_HOOKS_DIR = '.git/hooks';
 my $CENTRAL_HOOKS_DIR;
 
