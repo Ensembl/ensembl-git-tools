@@ -589,8 +589,6 @@ sub _default_modules {
     foreach my $module (@{$def_groups->{$group_name}->{modules}}) {
       if ($module =~ m/SO-Ontologies/){
         $def_modules{$module} = $SO_GITHUB_URL . $module . '.git';
-      } elsif ($module =~ m/GIFTS/){
-        $def_modules{$module} = $GIFTS_GITHUB_URL . $module . '.git';
       } elsif ($module =~ m/^(eg-|ensemblgenomes-)/) {
         $def_modules{$module} = $eg_root . $module . '.git';
       } else {
