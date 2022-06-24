@@ -46,7 +46,7 @@ sub run {
   my $options         = parse_command_line();
   my $remote          = $options->{'remote'};
   my $current_branch  = current_branch();
-  my $master_branch   = 'master';
+  my $master_branch   = 'main';
   my $release_branch;
   my $post_release_fix_branch;
 
