@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This extra command provides a way to push commits to master and release branch at once
+# This extra command provides a way to push commits to main and release branch at once
 # If possible, the commits are made on one branch and then fast-forwarded to the other,
 # if not, a new branch is created, all the commits are moved to that branch and then the
-# branch is merged into both master and release branch
+# branch is merged into both main and release branch
 
 use strict;
 use warnings;
@@ -46,7 +46,7 @@ sub run {
   my $options         = parse_command_line();
   my $remote          = $options->{'remote'};
   my $current_branch  = current_branch();
-  my $master_branch   = 'main';
+  my $main_branch   = 'main';
   my $release_branch;
   my $post_release_fix_branch;
 
@@ -110,16 +110,16 @@ sub run {
   }
 
   # Update both local branches to origin if possible
-  for ($master_branch, $release_branch, $post_release_fix_branch) {
+  for ($main_branch, $release_branch, $post_release_fix_branch) {
     update_branch($_, $remote);
   }
 
   # For Pull Requests
   my $no_merge = 1;
-  # get all commits in PRfix that are not in master or release branches
-  my $prf_commits_master = commits_list($master_branch, $post_release_fix_branch, $no_merge);
+  # get all commits in PRfix that are not in main or release branches
+  my $prf_commits_main = commits_list($main_branch, $post_release_fix_branch, $no_merge);
   my $prf_commits_release = commits_list($release_branch, $post_release_fix_branch, $no_merge);
-  my @prf_commits = uniq(@$prf_commits_release, @$prf_commits_master);
+  my @prf_commits = uniq(@$prf_commits_release, @$prf_commits_main);
   info("Checking $post_release_fix_branch for new commits");
   if ($#prf_commits >= 0) {
     info(join "\n", "Found commits in $post_release_fix_branch:", @prf_commits);
@@ -139,7 +139,7 @@ sub run {
 
   # Find out the branch that contains commits that need to be pushed
   my $branch_with_commits = {};
-  for ($master_branch, $release_branch) {
+  for ($main_branch, $release_branch) {
     if (!is_origin_uptodate($_, $remote, 1)) {
       $branch_with_commits->{$_} = commits_list("$remote/$_", $_);
     }
@@ -147,16 +147,16 @@ sub run {
 
   # If both branches have unpushed commits, we don't try to be over-intelligent and move commits around - leave that on to the user
   if (keys %$branch_with_commits == 2) {
-    error("Both '$master_branch' and '$release_branch' branches have commits to push. Please move these commits to release branch before you continue.");
+    error("Both '$main_branch' and '$release_branch' branches have commits to push. Please move these commits to release branch before you continue.");
   }
 
   # save pointers to the slower and the faster branch
-  my ($slower_branch, $faster_branch) = sort { exists $branch_with_commits->{$a} ? 1 : -1 } $master_branch, $release_branch;
+  my ($slower_branch, $faster_branch) = sort { exists $branch_with_commits->{$a} ? 1 : -1 } $main_branch, $release_branch;
 
 
   # If remote branches are actually at same point (and user doesn't mind fast-forwarding), fast-forward the slower local branch to the other
   if (!$options->{'no-ff'} && rev_parse("$remote/$release_branch") eq rev_parse("$remote/$post_release_fix_branch")
-      && rev_parse("$remote/$release_branch") eq rev_parse("$remote/$master_branch") ) {
+      && rev_parse("$remote/$release_branch") eq rev_parse("$remote/$main_branch") ) {
 
     # checkout the slower branch
     switch_branch($slower_branch);
@@ -176,11 +176,11 @@ sub run {
       error("Could not fast-forward branch '$post_release_fix_branch' to '$faster_branch'.");
     }
 
-    info("Local branches '$master_branch', '$release_branch' and '$post_release_fix_branch' are at the same point now.");
+    info("Local branches '$main_branch', '$release_branch' and '$post_release_fix_branch' are at the same point now.");
 
     # Finally push both
     my $failed_push = {};
-    for ($master_branch, $release_branch, $post_release_fix_branch) {
+    for ($main_branch, $release_branch, $post_release_fix_branch) {
       if (!push_branch($remote, $_, $options->{'no-push'})) {
         $failed_push->{$_} = 1;
       }
@@ -211,7 +211,7 @@ sub run {
   my $shared_branchpoint;
   if (!branch_exists($shared_branch)) {
     info("Creating new branch '$shared_branch'");
-    ($shared_branchpoint) = cmd("git merge-base $master_branch $release_branch");
+    ($shared_branchpoint) = cmd("git merge-base $main_branch $release_branch");
     chomp $shared_branchpoint;
     if (!branch($shared_branch, undef, $shared_branchpoint)) {
       error("Could not create branch '$shared_branch' from point '$shared_branchpoint'.");
@@ -287,14 +287,14 @@ sub run {
   # if merge not required, no need to go further
   if ($options->{'no-merge'}) {
     switch_branch($current_branch, 1);
-    info("Shared branch '$shared_branch' not merged into branches '$master_branch' and '$release_branch' as requested.");
+    info("Shared branch '$shared_branch' not merged into branches '$main_branch' and '$release_branch' as requested.");
     exit 0;
   }
 
-  # Now merge the new branch into both master and the release branch
+  # Now merge the new branch into both main and the release branch
   my $failed      = {};
   my $merge_fail  = [];
-  for ($master_branch, $release_branch) {
+  for ($main_branch, $release_branch) {
 
     # switch to the branch to merge shared branch to it
     if (!switch_branch($_, 1)) {
@@ -460,14 +460,14 @@ sub info {
 
 sub usage {
   print "usage: git mpush [options]
-    This command will push the un-pushed commits to master and the specified release branch at once.
-      If both the branchs are at a same point, the commits are made on master and then release branch is fast-forwarded to it,
-      if not, then a new branch postreleasefix/\$release_num is created and the commits are made to that branch before merging that branch to both master and the release branch.
+    This command will push the un-pushed commits to main and the specified release branch at once.
+      If both the branchs are at a same point, the commits are made on main and then release branch is fast-forwarded to it,
+      if not, then a new branch postreleasefix/\$release_num is created and the commits are made to that branch before merging that branch to both main and the release branch.
         --release <release> Release branch number to which commit is to be pushed (this is not needed if already on release branch)
         --sharedbranch      Prefix for the shared branch (defaults to 'postreleasefix')
-        --ff-only           Push only if master and release branch are on a same point.
+        --ff-only           Push only if main and release branch are on a same point.
         --no-ff             Create a third branch even if it was possible to fast-forward one branch to the other.
-        --no-merge          Push the commits to the postrelease branch but do not merge it back to master and release.
+        --no-merge          Push the commits to the postrelease branch but do not merge it back to main and release.
         --no-push           Stop when making the actual push to remote.
         --remote            Remote name (defaults to 'origin')\n";
   exit 0;
