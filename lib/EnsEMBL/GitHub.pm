@@ -62,7 +62,7 @@ sub paginated_rest_request {
   if ($headers->{link}){
     my @links = split(/,/, $headers->{link});
     foreach my $link (@links) {
-      if ($link =~ m/.+page=([0-9])>;\srel=\"(last)\"/) {  
+      if ($link =~ m/.+page=([0-9]+)>;\srel=\"(last)\"/) {  
         for (my $page=2; $page<=$1; $page++) {
           if ($url =~ m/\?/) {
             ($json_page, $headers_page) = rest_request($method, $url."&page=${page}", $oauth_token);
