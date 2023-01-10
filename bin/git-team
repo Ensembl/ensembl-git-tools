@@ -16,13 +16,13 @@
 # Update repositories - non-Production repos are maintained as
 # shallow copies, to reduce file size and make pulls quicker.
 
-# op can be 'clone', 'checkout', or 'pull';
-# for 'pull', the branch parameter is not used.
 
 # Script to use to save space on target by "not" cloning "shallow" repo with full history and depth=1
 # Parameters:
 #   - `-o` git operation to process - default to `pull`
 #       - For operation other than `pull` shallow repository are deleted and re-cloned to target `branch`
+#       - op can be 'clone', 'checkout', or 'pull';
+#         NB: for 'pull', the branches parameter is not used.
 #   - `-c` repository category to process - team|shallow - default to `shallow`
 #   - `-b` branch to apply operation onto - no effect on `pull` operation - default to `main`
 #   - `-f` fall back branch if `branch` doesn't exists - no effect on `pull` operation - default to `main`
