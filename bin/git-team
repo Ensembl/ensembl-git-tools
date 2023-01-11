@@ -63,7 +63,7 @@ fi
 # Ensembl shallow repositories (depth=1)
 branch=${branch:-"main"}
 default_branch=${default_branch:-"main"}
-target_dir=${target_dir:-"${HOME}/git-team"}
+target_dir=${target_dir:-"${PWD}"}
 
 if [[ ! -d $target_dir ]]; then
   mkdir -p $target_dir
@@ -81,9 +81,9 @@ echo "=================================================="
 if [[ $op == 'pull' ]]; then
   if [[ $category == 'shallow' ]]; then
     for repo in "${shallow[@]}"; do
-      echo "git ensembl --$op ${repo}"
+      echo "git -C ${target_dir}/${repo} pull"
       echo "-----------------------------------------"
-      git ensembl --$op ${repo}
+      git -C ${target_dir}/${repo} pull
     done
   else
     # shellcheck disable=SC2068
