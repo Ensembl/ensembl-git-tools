@@ -1,0 +1,137 @@
+#!/bin/bash
+# Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+# Copyright [2016-2022] EMBL-European Bioinformatics Institute
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# Update repositories - non-Production repos are maintained as
+# shallow copies, to reduce file size and make pulls quicker.
+
+
+# Script to use to save space on target by "not" cloning "shallow" repo with full history and depth=1
+# Parameters:
+#   - `-o` git operation to process - default to `pull`
+#       - For operation other than `pull` shallow repository are deleted and re-cloned to target `branch`
+#       - op can be 'clone', 'checkout', or 'pull';
+#         NB: for 'pull', the branches parameter is not used.
+#   - `-c` repository category to process - team|shallow - default to `shallow`
+#   - `-b` branch to apply operation onto - no effect on `pull` operation - default to `main`
+#   - `-f` fall back branch if `branch` doesn't exists - no effect on `pull` operation - default to `main`
+#   - `-s` shallow repositories to process / ignore (for git-config parameters)
+#   - `-p` production repositories to process
+#   - `-p|-s` can be either of:
+#       - "Ensembl" xxx repo name - ex: ensembl-production
+#       - "Git Ensembl config" as define in `./git-ensembl` command tool - ex: production
+#       - "File path" containing a list of repositories to process - one per line
+
+function usage {
+  echo "---------------------------------------"
+  echo "Usage: $0 [-o git_operation (pull)] [-c shallow|team (shallow)] [-b branch] [-f default_branch] [-t target_dir] [-r file|repo|git-config]"
+  echo "Example: $0 -o clone -c shallow -s ~/shallow.repo"
+  echo "Example: $0 -o pull -c team -s ~/shallow.repo -p ~/.prod.repo"
+  echo "---------------------------------------"
+  exit 1
+}
+shallow=()
+prod=()
+while getopts 'o:c:s:p:t:b:f:d' opt; do
+  case ${opt} in
+    o) op=${OPTARG} ;;
+    b) branch=${OPTARG} ;;
+    d) default_branch=${OPTARG} ;;
+    c) category=${OPTARG} ;;
+    t) target_dir=${OPTARG} ;;
+    s) shallow=${OPTARG} ;;
+    p) prod=${OPTARG} ;;
+    *) usage ;;
+  esac
+done
+
+# settings defaults
+op=${op:-'pull'}
+branch=${branch:-"main"}
+default_branch=${default_branch:-"main"}
+category=${category:-'shallow'}
+target_dir=${target_dir:-"${PWD}"}
+# checking params
+if [[ ! $category =~ shallow|team ]]; then
+  echo 'Category is "shallow" or "team"' >&2
+  usage
+fi
+if [[ "$category" == "shallow" ]]; then
+  if [[ -z "$shallow" ]]; then
+    # category shallow need shallow param
+    echo 'Missing -s for category "shallow"' >&2
+    usage
+  fi
+elif [[ -z "$prod" ]] || [[ -z "$shallow" ]]; then
+  # category
+  echo 'Missing -p and/or s for category "team"' >&2
+  usage
+fi
+
+if [[ ! -d $target_dir ]]; then
+  mkdir -p $target_dir
+fi
+# repo configuration with files
+if [[ -f "$shallow" ]]; then
+  echo "Loading shallow config from file `realpath $shallow`"
+  shallow=(`cat $(realpath $shallow)`)
+fi
+if [[ -f "$prod" ]]; then
+  echo "Loading team config from file `realpath $prod`"
+  prod=(`cat $(realpath $prod)`)
+fi
+
+ignore=( "${shallow[@]/#/--ignore_module }" )
+dir=$(pwd)
+cd ${target_dir}
+echo "Processing '${op}' (cat:${category}) from ${PWD} ..."
+echo "=================================================="
+# Using git-tools for pull will update all tags/branches,
+# which we don't want for our shallow copies.
+if [[ $op == 'pull' ]]; then
+  if [[ $category == 'shallow' ]]; then
+    for repo in "${shallow[@]}"; do
+      echo "git -C ${target_dir}/${repo} pull"
+      echo "-----------------------------------------"
+      git -C ${target_dir}/${repo} pull
+    done
+  else
+    # shellcheck disable=SC2068
+    echo "git ensembl --$op ${ignore[@]} ${prod[@]}"
+    echo "-----------------------------------------"
+    git ensembl --$op ${ignore[@]} ${prod[@]}
+  fi
+else
+  # Cleanest way to get a shallow copy with git-tools is to
+  # wipe out and start from scratch.
+  if [[ $category == 'shallow' ]]; then
+    for repo in ${shallow[@]}; do
+      rm -rf "${repo}"
+      if [ ! -d $repo ]; then
+        echo "git ensembl --clone --depth 1 --branch ${branch} --secondary_branch ${default_branch} $repo "
+        echo "----------------------------------------------------------------------------"
+        git ensembl --clone --depth 1 --branch ${branch} --secondary_branch ${default_branch} ${repo}
+      fi
+    done
+  else
+    for repo in ${prod[@]}; do
+      echo "Processing repo: $repo"
+      echo "git ensembl --${op} --branch ${branch} --secondary_branch ${default_branch} ${ignore[@]} ${repo}"
+      echo "-----------------------------------------------------------------------------"
+      git ensembl --${op} --branch ${branch} --secondary_branch ${default_branch} ${ignore[@]} ${repo}
+    done
+  fi
+fi
+# Return to initial directory
+cd $dir
